@@ -6,7 +6,7 @@ import datetime
 # Configure the DeepSeek API
 # --------------------------
 openai.api_base = "https://api.deepseek.com/beta"  # Using the v1 endpoint
-openai.api_key = st.secrets.get("DEEPOSEEK_API_KEY", "YOUR_API_KEY")
+openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "YOUR_API_KEY")
 
 # --------------------------
 # Title and Sidebar
