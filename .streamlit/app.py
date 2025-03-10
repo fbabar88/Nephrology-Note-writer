@@ -17,10 +17,10 @@ openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "YOUR_API_KEY")
 def fetch_guidelines(condition):
     """
     Fetch guideline text for a given condition.
-    Replace the URL and parsing logic with your actual guidelines API details,
-    or load from a local curated JSON file.
+    Option 1: (commented out) Fetch from an external API.
+    Option 2: Load from a local curated JSON file.
     """
-    # Option 1: Fetch from an external API
+    # External API (if available):
     # url = f"https://example-guidelines-api.com/guidelines?condition={condition}"
     # try:
     #     response = requests.get(url, timeout=5)
@@ -33,7 +33,7 @@ def fetch_guidelines(condition):
     #     st.error(f"Error fetching guidelines for {condition}: {e}")
     #     return ""
 
-    # Option 2: Load from a local JSON file (curated repository)
+    # Load from a local JSON file:
     try:
         with open("guidelines.json", "r") as file:
             guidelines_data = json.load(file)
@@ -56,7 +56,7 @@ if "start_time" in st.session_state:
     elapsed = time.time() - st.session_state.start_time
     st.sidebar.write(f"Time since start: {elapsed:.2f} seconds")
 
-# Global visit type for non-CKD conditions (affects all tabs)
+# Global visit type for all conditions (affects which input fields show up)
 visit_type = st.sidebar.radio("Select Visit Type", options=["New Patient", "Follow-Up"], key="visit_type")
 st.sidebar.write("Selected Visit Type:", visit_type)
 
@@ -94,7 +94,7 @@ with tabs[0]:
         if st.button("Generate CKD Note", key="ckd_new_generate"):
             elapsed = time.time() - st.session_state.get("start_time", time.time())
             st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-            guidelines = fetch_guidelines("KDIGO_CKD")  # e.g., key "KDIGO_CKD" in your JSON file
+            guidelines = fetch_guidelines("KDIGO_CKD")  # For example, use key "KDIGO_CKD"
             prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
@@ -118,7 +118,7 @@ Assessment & Plan (integrate any medication changes):
 Guideline Recommendations:
 {guidelines}
 
-Generate a comprehensive SOAP note focusing on the Subjective and Assessment & Plan sections for a new patient CKD evaluation.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focusing on the Subjective and Assessment & Plan sections for a new patient CKD evaluation.
 """
             st.code(prompt, language="plaintext")
             with st.spinner("Calling DeepSeek API..."):
@@ -147,7 +147,7 @@ Generate a comprehensive SOAP note focusing on the Subjective and Assessment & P
         if st.button("Generate CKD Note", key="ckd_fu_generate"):
             elapsed = time.time() - st.session_state.get("start_time", time.time())
             st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-            guidelines = fetch_guidelines("KDIGO_CKD_FollowUp")  # use a specific key for CKD follow-up if desired
+            guidelines = fetch_guidelines("KDIGO_CKD_FollowUp")  # Use a specific key for follow-up if desired
             prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
@@ -171,7 +171,7 @@ Assessment & Plan (with medication changes integrated):
 Guideline Recommendations:
 {guidelines}
 
-Generate a comprehensive SOAP note focusing on the Subjective and Assessment & Plan sections for a CKD follow-up visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focusing on the Subjective and Assessment & Plan sections for a CKD follow-up visit.
 """
             st.code(prompt, language="plaintext")
             with st.spinner("Calling DeepSeek API..."):
@@ -236,7 +236,7 @@ Labs:
 Assessment & Plan (integrate any medication changes within this section):
 {assessment_plan}
 
-Generate a SOAP note focused on the evaluation of hypertension for a new patient visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of hypertension for a new patient visit.
 """
         generate_note_with_guidelines(prompt, "htn_generate_new", "AHA_HTN")
     else:
@@ -257,7 +257,7 @@ Labs:
 Assessment & Plan (with medication changes integrated):
 {assessment_plan}
 
-Generate a SOAP note focused on the follow-up evaluation of hypertension, ensuring that medication changes are integrated within the Assessment & Plan section.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of hypertension.
 """
         generate_note_with_guidelines(prompt, "htn_generate_fu", "AHA_HTN")
 
@@ -285,7 +285,7 @@ Labs:
 Assessment & Plan (integrate any medication changes within this section):
 {assessment_plan}
 
-Generate a SOAP note focused on the evaluation of glomerulonephritis for a new patient visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of glomerulonephritis for a new patient visit.
 """
         generate_note_with_guidelines(prompt, "gng_generate_new", "ANCA_Vasculitis")
     else:
@@ -306,7 +306,7 @@ Labs:
 Assessment & Plan (with medication changes integrated):
 {assessment_plan}
 
-Generate a SOAP note focused on the follow-up evaluation of glomerulonephritis.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of glomerulonephritis.
 """
         generate_note_with_guidelines(prompt, "gng_generate_fu", "ANCA_Vasculitis")
 
@@ -334,7 +334,7 @@ Labs:
 Assessment & Plan (integrate any medication changes within this section):
 {assessment_plan}
 
-Generate a SOAP note focused on the evaluation of hyponatremia for a new patient visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of hyponatremia for a new patient visit.
 """
         generate_note_with_guidelines(prompt, "hyponat_generate_new", "Hyponatremia_Treatment")
     else:
@@ -355,7 +355,7 @@ Labs:
 Assessment & Plan (with medication changes integrated):
 {assessment_plan}
 
-Generate a SOAP note focused on the follow-up evaluation of hyponatremia.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of hyponatremia.
 """
         generate_note_with_guidelines(prompt, "hyponat_generate_fu", "Hyponatremia_Treatment")
 
@@ -383,7 +383,7 @@ Labs:
 Assessment & Plan (integrate any medication changes within this section):
 {assessment_plan}
 
-Generate a SOAP note focused on the evaluation of hypokalemia for a new patient visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of hypokalemia for a new patient visit.
 """
         generate_note_with_guidelines(prompt, "hypokalemia_generate_new", "Hypokalemia")
     else:
@@ -404,7 +404,7 @@ Labs:
 Assessment & Plan (with medication changes integrated):
 {assessment_plan}
 
-Generate a SOAP note focused on the follow-up evaluation of hypokalemia.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of hypokalemia.
 """
         generate_note_with_guidelines(prompt, "hypokalemia_generate_fu", "Hypokalemia")
 
@@ -432,7 +432,7 @@ Labs:
 Assessment & Plan (integrate any medication changes within this section):
 {assessment_plan}
 
-Generate a SOAP note focused on the evaluation of proteinuria and hematuria for a new patient visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of proteinuria and hematuria for a new patient visit.
 """
         generate_note_with_guidelines(prompt, "prot_hema_generate_new", "Proteinuria_Hematuria")
     else:
@@ -453,7 +453,7 @@ Labs:
 Assessment & Plan (with medication changes integrated):
 {assessment_plan}
 
-Generate a SOAP note focused on the follow-up evaluation of proteinuria and hematuria.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of proteinuria and hematuria.
 """
         generate_note_with_guidelines(prompt, "prot_hema_generate_fu", "Proteinuria_Hematuria")
 
@@ -485,7 +485,7 @@ Labs:
 Assessment & Plan (integrate any medication changes within this section):
 {assessment_plan}
 
-Generate a SOAP note focused on the evaluation of a renal cyst for a new patient visit.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of a renal cyst for a new patient visit.
 """
         generate_note_with_guidelines(prompt, "renal_cyst_generate_new", "Renal_Cyst")
     else:
@@ -510,6 +510,7 @@ Labs:
 Assessment & Plan (with medication changes integrated):
 {assessment_plan}
 
-Generate a SOAP note focused on the follow-up evaluation of a renal cyst.
+Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of a renal cyst.
 """
         generate_note_with_guidelines(prompt, "renal_cyst_generate_fu", "Renal_Cyst")
+
