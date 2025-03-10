@@ -8,7 +8,7 @@ import json
 # --------------------------
 # Configure the DeepSeek API
 # --------------------------
-openai.api_base = "https://api.deepseek.com/beta"  # Using the v1 endpoint
+openai.api_base = "https://api.deepseek.com/v1"  # Using the v1 endpoint
 openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "YOUR_API_KEY")
 
 # --------------------------
@@ -64,6 +64,31 @@ st.sidebar.write("Selected Visit Type:", visit_type)
 visit_date = datetime.date.today().strftime("%B %d, %Y")
 
 # --------------------------
+# Helper function for non-CKD conditions with guideline integration
+# --------------------------
+def generate_note_with_guidelines(prompt, button_key, condition):
+    guidelines = fetch_guidelines(condition)
+    full_prompt = f"{prompt}\n\nGuideline Recommendations:\n{guidelines}\n"
+    st.code(full_prompt, language="plaintext")
+    if st.button("Generate Note", key=button_key):
+        elapsed = time.time() - st.session_state.get("start_time", time.time())
+        st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
+        with st.spinner("Calling DeepSeek API..."):
+            try:
+                response = openai.Completion.create(
+                    model="deepseek-chat",
+                    prompt=full_prompt,
+                    max_tokens=800,
+                    temperature=0.7,
+                )
+                generated_note = response.choices[0].text.strip()
+                st.subheader("Generated Note")
+                # Final document loaded into an editable text area
+                edited_note = st.text_area("Final Note (Editable)", value=generated_note, height=300, key=f"editable_{button_key}")
+            except Exception as e:
+                st.error(f"API call failed: {e}")
+
+# --------------------------
 # Create Tabs for Different Conditions
 # --------------------------
 tab_labels = [
@@ -94,7 +119,7 @@ with tabs[0]:
         if st.button("Generate CKD Note", key="ckd_new_generate"):
             elapsed = time.time() - st.session_state.get("start_time", time.time())
             st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-            guidelines = fetch_guidelines("KDIGO_CKD")  # For example, use key "KDIGO_CKD"
+            guidelines = fetch_guidelines("KDIGO_CKD")  # For new CKD evaluation
             prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
@@ -131,7 +156,7 @@ Generate a comprehensive narrative note in paragraph form, written in the style 
                     )
                     generated_note = response.choices[0].text.strip()
                     st.subheader("Generated Note")
-                    st.markdown(generated_note)
+                    edited_note = st.text_area("Final Note (Editable)", value=generated_note, height=300, key="editable_ckd_new")
                 except Exception as e:
                     st.error(f"API call failed: {e}")
     else:
@@ -147,7 +172,7 @@ Generate a comprehensive narrative note in paragraph form, written in the style 
         if st.button("Generate CKD Note", key="ckd_fu_generate"):
             elapsed = time.time() - st.session_state.get("start_time", time.time())
             st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-            guidelines = fetch_guidelines("KDIGO_CKD_FollowUp")  # Use a specific key for follow-up if desired
+            guidelines = fetch_guidelines("KDIGO_CKD_FollowUp")
             prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
@@ -184,33 +209,9 @@ Generate a comprehensive narrative note in paragraph form, written in the style 
                     )
                     generated_note = response.choices[0].text.strip()
                     st.subheader("Generated Note")
-                    st.markdown(generated_note)
+                    edited_note = st.text_area("Final Note (Editable)", value=generated_note, height=300, key="editable_ckd_fu")
                 except Exception as e:
                     st.error(f"API call failed: {e}")
-
-# --------------------------
-# Helper function for non-CKD conditions with guideline integration
-# --------------------------
-def generate_note_with_guidelines(prompt, button_key, condition):
-    guidelines = fetch_guidelines(condition)
-    full_prompt = f"{prompt}\n\nGuideline Recommendations:\n{guidelines}\n"
-    st.code(full_prompt, language="plaintext")
-    if st.button("Generate Note", key=button_key):
-        elapsed = time.time() - st.session_state.get("start_time", time.time())
-        st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-        with st.spinner("Calling DeepSeek API..."):
-            try:
-                response = openai.Completion.create(
-                    model="deepseek-chat",
-                    prompt=full_prompt,
-                    max_tokens=800,
-                    temperature=0.7,
-                )
-                generated_note = response.choices[0].text.strip()
-                st.subheader("Generated Note")
-                st.markdown(generated_note)
-            except Exception as e:
-                st.error(f"API call failed: {e}")
 
 # --------------------------
 # Tab 2: Hypertension (HTN)
@@ -233,7 +234,7 @@ HPI:
 Labs:
 {labs}
 
-Assessment & Plan (integrate any medication changes within this section):
+Assessment & Plan (integrate any medication changes):
 {assessment_plan}
 
 Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of hypertension for a new patient visit.
@@ -282,7 +283,7 @@ HPI:
 Labs:
 {labs}
 
-Assessment & Plan (integrate any medication changes within this section):
+Assessment & Plan (integrate any medication changes):
 {assessment_plan}
 
 Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of glomerulonephritis for a new patient visit.
@@ -292,225 +293,4 @@ Generate a comprehensive narrative note in paragraph form, written in the style 
         interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key="gng_interval")
         labs = st.text_area("Labs", "Enter updated lab data...", key="gng_labs_fu")
         assessment_plan = st.text_area("Assessment & Plan (integrate Medication Changes)", "Enter assessment and plan for glomerulonephritis, integrating any medication changes...", key="gng_ap_fu")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Glomerulonephritis Follow-Up]
-
-Interval History:
-{interval_history}
-
-Labs:
-{labs}
-
-Assessment & Plan (with medication changes integrated):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of glomerulonephritis.
-"""
-        generate_note_with_guidelines(prompt, "gng_generate_fu", "ANCA_Vasculitis")
-
-# --------------------------
-# Tab 4: Hyponatremia
-# --------------------------
-with tabs[3]:
-    st.header("Hyponatremia")
-    reason_for_visit = st.text_input("Reason for Visit", "Hyponatremia Evaluation/Follow-Up", key="hyponat_reason")
-    if visit_type == "New Patient":
-        hpi = st.text_area("HPI", "Enter patient's HPI (symptoms, onset, etc.)", key="hyponat_hpi")
-        labs = st.text_area("Labs", "Enter lab data (serum sodium, osmolality, etc.)", key="hyponat_labs_new")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan for hyponatremia...", key="hyponat_ap_new")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Hyponatremia New Patient Evaluation]
-
-HPI:
-{hpi}
-
-Labs:
-{labs}
-
-Assessment & Plan (integrate any medication changes within this section):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of hyponatremia for a new patient visit.
-"""
-        generate_note_with_guidelines(prompt, "hyponat_generate_new", "Hyponatremia_Treatment")
-    else:
-        interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key="hyponat_interval")
-        labs = st.text_area("Labs", "Enter updated lab data...", key="hyponat_labs_fu")
-        assessment_plan = st.text_area("Assessment & Plan (integrate Medication Changes)", "Enter assessment and plan for hyponatremia, integrating any medication changes...", key="hyponat_ap_fu")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Hyponatremia Follow-Up]
-
-Interval History:
-{interval_history}
-
-Labs:
-{labs}
-
-Assessment & Plan (with medication changes integrated):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of hyponatremia.
-"""
-        generate_note_with_guidelines(prompt, "hyponat_generate_fu", "Hyponatremia_Treatment")
-
-# --------------------------
-# Tab 5: Hypokalemia
-# --------------------------
-with tabs[4]:
-    st.header("Hypokalemia")
-    reason_for_visit = st.text_input("Reason for Visit", "Hypokalemia Evaluation/Follow-Up", key="hypokalemia_reason")
-    if visit_type == "New Patient":
-        hpi = st.text_area("HPI", "Enter patient's HPI (symptoms such as muscle weakness, cramps, etc.)", key="hypokalemia_hpi")
-        labs = st.text_area("Labs", "Enter lab data (serum potassium, magnesium, ECG, etc.)", key="hypokalemia_labs_new")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan for hypokalemia...", key="hypokalemia_ap_new")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Hypokalemia New Patient Evaluation]
-
-HPI:
-{hpi}
-
-Labs:
-{labs}
-
-Assessment & Plan (integrate any medication changes within this section):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of hypokalemia for a new patient visit.
-"""
-        generate_note_with_guidelines(prompt, "hypokalemia_generate_new", "Hypokalemia")
-    else:
-        interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key="hypokalemia_interval")
-        labs = st.text_area("Labs", "Enter updated lab data...", key="hypokalemia_labs_fu")
-        assessment_plan = st.text_area("Assessment & Plan (integrate Medication Changes)", "Enter assessment and plan for hypokalemia, integrating any medication changes...", key="hypokalemia_ap_fu")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Hypokalemia Follow-Up]
-
-Interval History:
-{interval_history}
-
-Labs:
-{labs}
-
-Assessment & Plan (with medication changes integrated):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of hypokalemia.
-"""
-        generate_note_with_guidelines(prompt, "hypokalemia_generate_fu", "Hypokalemia")
-
-# --------------------------
-# Tab 6: Proteinuria & Hematuria
-# --------------------------
-with tabs[5]:
-    st.header("Proteinuria & Hematuria")
-    reason_for_visit = st.text_input("Reason for Visit", "Proteinuria & Hematuria Evaluation/Follow-Up", key="prot_hema_reason")
-    if visit_type == "New Patient":
-        hpi = st.text_area("HPI", "Enter patient's HPI (symptoms, onset, etc.)", key="prot_hema_hpi")
-        labs = st.text_area("Labs", "Enter lab data (urinalysis, protein quantification, etc.)", key="prot_hema_labs_new")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan for proteinuria/hematuria...", key="prot_hema_ap_new")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Proteinuria & Hematuria New Patient Evaluation]
-
-HPI:
-{hpi}
-
-Labs:
-{labs}
-
-Assessment & Plan (integrate any medication changes within this section):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of proteinuria and hematuria for a new patient visit.
-"""
-        generate_note_with_guidelines(prompt, "prot_hema_generate_new", "Proteinuria_Hematuria")
-    else:
-        interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key="prot_hema_interval")
-        labs = st.text_area("Labs", "Enter updated lab data...", key="prot_hema_labs_fu")
-        assessment_plan = st.text_area("Assessment & Plan (integrate Medication Changes)", "Enter assessment and plan for proteinuria/hematuria, integrating any medication changes...", key="prot_hema_ap_fu")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Proteinuria & Hematuria Follow-Up]
-
-Interval History:
-{interval_history}
-
-Labs:
-{labs}
-
-Assessment & Plan (with medication changes integrated):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of proteinuria and hematuria.
-"""
-        generate_note_with_guidelines(prompt, "prot_hema_generate_fu", "Proteinuria_Hematuria")
-
-# --------------------------
-# Tab 7: Renal Cyst
-# --------------------------
-with tabs[6]:
-    st.header("Renal Cyst")
-    reason_for_visit = st.text_input("Reason for Visit", "Renal Cyst Evaluation/Follow-Up", key="renal_cyst_reason")
-    if visit_type == "New Patient":
-        hpi = st.text_area("HPI", "Enter patient's HPI (if symptomatic, or note if incidental)...", key="renal_cyst_hpi")
-        imaging = st.text_area("Imaging Findings", "Enter details from imaging (size, location, complexity)...", key="renal_cyst_imaging_new")
-        labs = st.text_area("Labs", "Enter lab data (if available)...", key="renal_cyst_labs_new")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan for renal cyst (integrate any medication changes)...", key="renal_cyst_ap_new")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Renal Cyst New Patient Evaluation]
-
-HPI:
-{hpi}
-
-Imaging Findings:
-{imaging}
-
-Labs:
-{labs}
-
-Assessment & Plan (integrate any medication changes within this section):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the evaluation of a renal cyst for a new patient visit.
-"""
-        generate_note_with_guidelines(prompt, "renal_cyst_generate_new", "Renal_Cyst")
-    else:
-        interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key="renal_cyst_interval")
-        imaging = st.text_area("Imaging Findings", "Enter updated imaging details (if any)...", key="renal_cyst_imaging_fu")
-        labs = st.text_area("Labs", "Enter updated lab data...", key="renal_cyst_labs_fu")
-        assessment_plan = st.text_area("Assessment & Plan (integrate Medication Changes)", "Enter assessment and plan for renal cyst, integrating any medication changes...", key="renal_cyst_ap_fu")
-        prompt = f"""
-Visit Date: {visit_date}
-Reason for Visit: {reason_for_visit}
-[Renal Cyst Follow-Up]
-
-Interval History:
-{interval_history}
-
-Imaging Findings:
-{imaging}
-
-Labs:
-{labs}
-
-Assessment & Plan (with medication changes integrated):
-{assessment_plan}
-
-Generate a comprehensive narrative note in paragraph form, written in the style of a seasoned nephrologist at the end of the visit, focused on the follow-up evaluation of a renal cyst.
-"""
-        generate_note_with_guidelines(prompt, "renal_cyst_generate_fu", "Renal_Cyst")
-
+      
