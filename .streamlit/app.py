@@ -5,7 +5,7 @@ import time
 
 # Configure DeepSeek API using the beta endpoint and a lower temperature
 openai.api_base = "https://api.deepseek.com/beta"
-openai.api_key = st.secrets.get("DEEPOSEEK_API_KEY", "YOUR_API_KEY")
+openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "YOUR_API_KEY")
 
 st.title("Nephrology Progress Note Generator")
 
