@@ -57,9 +57,9 @@ st.sidebar.write("Selected Condition:", condition)
 
 # Reset Form button clears session state so that all inputs are cleared.
 if st.sidebar.button("Reset Form"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
+    st.session_state.clear()
     st.experimental_rerun()
+
 
 # Map condition to guideline key (for CKD, use different keys based on visit type)
 guideline_keys = {
