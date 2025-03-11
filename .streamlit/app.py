@@ -57,7 +57,6 @@ st.sidebar.write("Selected Condition:", condition)
 
 # Reset Form button clears session state so that all inputs are cleared.
 if st.sidebar.button("Reset Form"):
-    # Remove all keys from session state (adjust if you want to keep specific ones)
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.experimental_rerun()
@@ -78,23 +77,27 @@ selected_guideline_key = guideline_keys.get(condition, "")
 visit_date = datetime.date.today().strftime("%B %d, %Y")
 
 # --------------------------
-# Main Interface: Input Fields and Prompt Construction
+# Main Interface: Select Input Mode
 # --------------------------
 st.header(f"{condition} Progress Note")
 
-# For CKD, use a specialized layout
-if condition == "CKD":
-    if visit_type == "New Patient":
-        reason_for_visit = st.text_input("Reason for Visit", "CKD Evaluation", key="ckd_new_reason")
-        symptoms = st.text_area("Symptoms", "Enter patient's symptoms...", key="ckd_new_symptoms")
-        risk_factors = st.text_area("Risk Factors", "Enter risk factors (e.g., NSAIDs, DM, HTN, nephrotoxins)...", key="ckd_new_risk_factors")
-        dm_status = st.text_input("Diabetes Mellitus Status", "Present/Absent", key="ckd_new_dm_status")
-        htn_status = st.text_input("Hypertension Status", "Present/Absent", key="ckd_new_htn_status")
-        labs = st.text_area("Lab Data", "Enter relevant lab data...", key="ckd_new_labs")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key="ckd_new_ap")
-        additional_details = st.text_area("Additional Comments (Optional)", "", key="ckd_new_extra")
-        
-        prompt = f"""
+# Choose between Structured Input and Free Text modes
+input_mode = st.radio("Select Input Mode", options=["Structured Input", "Free Text"], key="input_mode")
+
+if input_mode == "Structured Input":
+    # Structured input for each field
+    if condition == "CKD":
+        if visit_type == "New Patient":
+            reason_for_visit = st.text_input("Reason for Visit", "CKD Evaluation", key="ckd_new_reason")
+            symptoms = st.text_area("Symptoms", "Enter patient's symptoms...", key="ckd_new_symptoms")
+            risk_factors = st.text_area("Risk Factors", "Enter risk factors (e.g., NSAIDs, DM, HTN, nephrotoxins)...", key="ckd_new_risk_factors")
+            dm_status = st.text_input("Diabetes Mellitus Status", "Present/Absent", key="ckd_new_dm_status")
+            htn_status = st.text_input("Hypertension Status", "Present/Absent", key="ckd_new_htn_status")
+            labs = st.text_area("Lab Data", "Enter relevant lab data...", key="ckd_new_labs")
+            assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key="ckd_new_ap")
+            additional_details = st.text_area("Additional Comments (Optional)", "", key="ckd_new_extra")
+            
+            prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
 [New Patient - CKD Evaluation]
@@ -106,23 +109,23 @@ Additional Info: Diabetes Mellitus Status: {dm_status}, Hypertension Status: {ht
 Lab Data: {labs}.
 Additional Comments: {additional_details}.
 
-Assessment & Plan (integrate any medication changes):
+Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
 """
-    else:  # Follow-Up for CKD
-        reason_for_visit = st.text_input("Reason for Visit", "CKD Follow-Up", key="ckd_fu_reason")
-        interval_history = st.text_area("Interval History", "Enter changes since last visit...", key="ckd_fu_interval")
-        ckd_stage = st.selectbox("CKD Stage", options=["1", "2", "3", "4", "5"], index=2, key="ckd_fu_stage")
-        kidney_trend = st.selectbox("Kidney Function Trend", options=["Improving", "Stable", "Worsening"], key="ckd_fu_trend")
-        dm_status = st.text_input("Diabetes Mellitus Status", "Controlled/Uncontrolled", key="ckd_fu_dm_status")
-        htn_status = st.text_input("Hypertension Status", "Controlled/Uncontrolled", key="ckd_fu_htn_status")
-        labs = st.text_area("Lab Data", "Enter updated lab data...", key="ckd_fu_labs")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key="ckd_fu_ap")
-        additional_details = st.text_area("Additional Comments (Optional)", "", key="ckd_fu_extra")
-        
-        prompt = f"""
+        else:  # Follow-Up for CKD
+            reason_for_visit = st.text_input("Reason for Visit", "CKD Follow-Up", key="ckd_fu_reason")
+            interval_history = st.text_area("Interval History", "Enter changes since last visit...", key="ckd_fu_interval")
+            ckd_stage = st.selectbox("CKD Stage", options=["1", "2", "3", "4", "5"], index=2, key="ckd_fu_stage")
+            kidney_trend = st.selectbox("Kidney Function Trend", options=["Improving", "Stable", "Worsening"], key="ckd_fu_trend")
+            dm_status = st.text_input("Diabetes Mellitus Status", "Controlled/Uncontrolled", key="ckd_fu_dm_status")
+            htn_status = st.text_input("Hypertension Status", "Controlled/Uncontrolled", key="ckd_fu_htn_status")
+            labs = st.text_area("Lab Data", "Enter updated lab data...", key="ckd_fu_labs")
+            assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key="ckd_fu_ap")
+            additional_details = st.text_area("Additional Comments (Optional)", "", key="ckd_fu_extra")
+            
+            prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
 [Follow-Up - CKD]
@@ -133,56 +136,65 @@ Additional Info: Diabetes Mellitus Status: {dm_status}, Hypertension Status: {ht
 Lab Data: {labs}.
 Additional Comments: {additional_details}.
 
-Assessment & Plan (with medication changes integrated):
+Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
 """
-# For non-CKD conditions, use a generic template
-else:
-    if visit_type == "New Patient":
-        reason_for_visit = st.text_input("Reason for Visit", f"{condition} Evaluation", key=f"{condition}_new_reason")
-        hpi = st.text_area("HPI", "Enter patient's HPI (symptoms, onset, etc.)", key=f"{condition}_new_hpi")
-        labs = st.text_area("Labs", "Enter lab data, if any...", key=f"{condition}_new_labs")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key=f"{condition}_new_ap")
-        additional_details = st.text_area("Additional Comments (Optional)", "", key=f"{condition}_new_extra")
-        
-        prompt = f"""
+    else:
+        if visit_type == "New Patient":
+            reason_for_visit = st.text_input("Reason for Visit", f"{condition} Evaluation", key=f"{condition}_new_reason")
+            hpi = st.text_area("HPI", "Enter patient's HPI (symptoms, onset, etc.)", key=f"{condition}_new_hpi")
+            labs = st.text_area("Labs", "Enter lab data, if any...", key=f"{condition}_new_labs")
+            assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key=f"{condition}_new_ap")
+            additional_comments = st.text_area("Additional Comments (Optional)", "", key=f"{condition}_new_extra")
+            
+            prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
 
 Subjective:
 HPI: {hpi}.
 Lab Data: {labs}.
-Additional Comments: {additional_details}.
+Additional Comments: {additional_comments}.
 
-Assessment & Plan (integrate any medication changes):
+Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
 """
-    else:
-        reason_for_visit = st.text_input("Reason for Visit", f"{condition} Follow-Up", key=f"{condition}_fu_reason")
-        interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key=f"{condition}_fu_interval")
-        labs = st.text_area("Labs", "Enter updated lab data...", key=f"{condition}_fu_labs")
-        assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key=f"{condition}_fu_ap")
-        additional_details = st.text_area("Additional Comments (Optional)", "", key=f"{condition}_fu_extra")
-        
-        prompt = f"""
+        else:
+            reason_for_visit = st.text_input("Reason for Visit", f"{condition} Follow-Up", key=f"{condition}_fu_reason")
+            interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key=f"{condition}_fu_interval")
+            labs = st.text_area("Labs", "Enter updated lab data...", key=f"{condition}_fu_labs")
+            assessment_plan = st.text_area("Assessment & Plan", "Enter assessment and plan (integrate any medication changes)...", key=f"{condition}_fu_ap")
+            additional_comments = st.text_area("Additional Comments (Optional)", "", key=f"{condition}_fu_extra")
+            
+            prompt = f"""
 Visit Date: {visit_date}
 Reason for Visit: {reason_for_visit}
 
 Interval History: {interval_history}
 Lab Data: {labs}.
-Additional Comments: {additional_details}.
+Additional Comments: {additional_comments}.
 
-Assessment & Plan (with medication changes integrated):
+Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
 """
-        
-# Display the constructed prompt (for debugging purposes)
+else:
+    # Free Text Mode: Only one text area is shown
+    free_text_input = st.text_area("Enter your note details in free text", "Type your note here...", key="free_text")
+    prompt = f"""
+Visit Date: {visit_date}
+
+{free_text_input}
+
+{final_instruction}
+"""
+
+# Display the constructed prompt for review/debugging
 st.code(prompt, language="plaintext")
 
 # --------------------------
@@ -194,7 +206,6 @@ if st.button("Generate Progress Note", key="generate_note"):
     else:
         elapsed = time.time() - st.session_state.start_time
         st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-        # Append guideline recommendations automatically based on condition from our curated JSON:
         guidelines_text = fetch_guidelines(selected_guideline_key)
         full_prompt = f"{prompt}\n\nGuideline Recommendations:\n{guidelines_text}"
         st.code(full_prompt, language="plaintext")
