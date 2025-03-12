@@ -56,12 +56,12 @@ condition = st.sidebar.selectbox(
 st.sidebar.write("Selected Condition:", condition)
 
 # Reset Form button clears session state so that all inputs are cleared.
-def reset_form():
-    st.session_state.clear()
-    st.experimental_rerun()
-
 if st.sidebar.button("Reset Form"):
-    reset_form()
+    st.session_state.clear()
+    if hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()
+    else:
+        st.error("Your Streamlit version does not support experimental_rerun. Please update Streamlit.")
 
 # Map condition to guideline key (for CKD, use different keys based on visit type)
 guideline_keys = {
