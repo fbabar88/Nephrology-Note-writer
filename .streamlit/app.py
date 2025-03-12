@@ -1,4 +1,5 @@
 import streamlit as st
+st.write("Streamlit version:", st.__version__)
 import openai
 import datetime
 import time
