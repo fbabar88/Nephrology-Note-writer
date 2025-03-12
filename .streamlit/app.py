@@ -56,10 +56,12 @@ condition = st.sidebar.selectbox(
 st.sidebar.write("Selected Condition:", condition)
 
 # Reset Form button clears session state so that all inputs are cleared.
-if st.sidebar.button("Reset Form"):
+def reset_form():
     st.session_state.clear()
     st.experimental_rerun()
 
+if st.sidebar.button("Reset Form"):
+    reset_form()
 
 # Map condition to guideline key (for CKD, use different keys based on visit type)
 guideline_keys = {
