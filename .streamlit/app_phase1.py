@@ -32,15 +32,41 @@ if "patients" not in st.session_state:
 if "current_patient" not in st.session_state:
     st.session_state.current_patient = None
 
-# Sidebar: Active Patient List
+# Sidebar: Active Patients List and Add New Patient
 st.sidebar.title("Active Patients")
+
+# Display active patient list
 patient_options = [
     f"{p['id']} - {p['note_type']} - {p['reason']}" for p in st.session_state.patients
 ]
 selected_patient = st.sidebar.selectbox("Select a patient", patient_options)
 
+# Add New Patient Section
+st.sidebar.markdown("---")
+st.sidebar.subheader("Add New Patient")
+new_patient_id = st.sidebar.text_input("Patient ID/Initials", key="new_id")
+new_reason = st.sidebar.text_input("Reason for Consult", key="new_reason")
+new_note_type = st.sidebar.selectbox("Note Type", ["Consult", "Progress"], key="new_note_type")
+if st.sidebar.button("Add Patient"):
+    if new_patient_id and new_reason:
+        # Create a new patient record with default empty notes
+        new_patient = {
+            "id": new_patient_id,
+            "note_type": new_note_type,
+            "reason": new_reason,
+            "consultation_note": "",
+            "soap_note": "",
+            "last_updated": str(datetime.datetime.now())
+        }
+        st.session_state.patients.append(new_patient)
+        st.sidebar.success(f"Patient {new_patient_id} added successfully!")
+        # Refresh the selectbox by updating the session state (simulate a refresh)
+        st.experimental_rerun()
+    else:
+        st.sidebar.error("Please enter both Patient ID and Reason for Consult.")
+
+# Load the selected patient record
 if selected_patient:
-    # Extract patient ID from selected string and load the record
     selected_id = selected_patient.split(" - ")[0]
     patient_record = next((p for p in st.session_state.patients if p["id"] == selected_id), None)
     st.session_state.current_patient = patient_record
@@ -49,16 +75,16 @@ if selected_patient:
     st.write(f"**Reason for Consult:** {patient_record['reason']}")
     st.write(f"**Last Updated:** {patient_record.get('last_updated', 'N/A')}")
 
-    # Create tabs for the two note generation modes
+    # Create tabs for Consultation Note and SOAP Note
     tab1, tab2 = st.tabs(["Consultation Note", "SOAP Note"])
 
     with tab1:
         st.subheader("Generate Consultation Note")
         # Pre-populate the reason from the patient record
-        reason = st.text_input("Reason for Consultation:", patient_record["reason"])
-        symptoms = st.text_area("Presenting Symptoms:", "", height=80)
-        context_history = st.text_area("Clinical History & Context:", "", height=80)
-        labs = st.text_area("Labs:", "", height=80)
+        reason = st.text_input("Reason for Consultation:", patient_record["reason"], key="reason")
+        symptoms = st.text_area("Presenting Symptoms:", "", height=80, key="symptoms")
+        context_history = st.text_area("Clinical History & Context:", "", height=80, key="context")
+        labs = st.text_area("Labs:", "", height=80, key="labs")
         assessment_plan_input = st.text_area(
             "Assessment & Plan:",
             "Enter a combined list of problem headings and corresponding treatment options.\n"
@@ -66,7 +92,8 @@ if selected_patient:
             "AKI: Optimize fluid management, avoid nephrotoxic agents, consider RRT if indicated.\n"
             "Metabolic Acidosis: Monitor acid-base status, administer bicarbonate if pH < 7.2.\n"
             "Cardiogenic Shock: Adjust pressor support and collaborate with cardiology.",
-            height=150
+            height=150,
+            key="assessment"
         )
 
         if st.button("Generate Consultation Note"):
@@ -111,7 +138,7 @@ Do not add any extra summary sections.
 
     with tab2:
         st.subheader("Generate SOAP Note")
-        case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150)
+        case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150, key="case_update")
 
         if st.button("Generate SOAP Note"):
             if not patient_record.get("consultation_note"):
