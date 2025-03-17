@@ -81,4 +81,150 @@ if st.sidebar.button("Add Patient"):
             "last_updated": str(datetime.datetime.now())
         }
         st.session_state.patients.append(new_patient)
-        st.sidebar.success(f"Patient {new_patient_id} 
+        st.sidebar.success(f"Patient {new_patient_id} added successfully!")
+        st.experimental_rerun()
+    else:
+        st.sidebar.error("Please enter both Patient ID and Reason for Consult.")
+
+# Load the selected patient record
+if selected_patient:
+    selected_id = selected_patient.split(" - ")[0]
+    patient_record = next((p for p in st.session_state.patients if p["id"] == selected_id), None)
+    st.session_state.current_patient = patient_record
+
+    st.header(f"Patient {patient_record['id']} - {patient_record['note_type']}")
+    st.write(f"**Reason for Consult:** {patient_record['reason']}")
+    st.write(f"**Last Updated:** {patient_record.get('last_updated', 'N/A')}")
+
+    # Create tabs for Consultation Note, SOAP Note, and Follow-Up Update
+    tab1, tab2, tab3 = st.tabs(["Consultation Note", "SOAP Note", "Follow-Up Update"])
+
+    with tab1:
+        st.subheader("Generate Consultation Note")
+        # Pre-populate the reason from the patient record
+        reason = st.text_input("Reason for Consultation:", patient_record["reason"], key="reason")
+        symptoms = st.text_area("Presenting Symptoms:", "", height=80, key="symptoms")
+        context_history = st.text_area("Clinical History & Context:", "", height=80, key="context")
+        labs = st.text_area("Labs:", "", height=80, key="labs")
+        assessment_plan_input = st.text_area(
+            "Assessment & Plan:",
+            "Enter a combined list of problem headings and corresponding treatment options.\n"
+            "For example:\n"
+            "AKI: Optimize fluid management, avoid nephrotoxic agents, consider RRT if indicated.\n"
+            "Metabolic Acidosis: Monitor acid-base status, administer bicarbonate if pH < 7.2.\n"
+            "Cardiogenic Shock: Adjust pressor support and collaborate with cardiology.",
+            height=150,
+            key="assessment"
+        )
+        if st.button("Generate Consultation Note"):
+            prompt = f"""
+Generate a comprehensive Epic consultation note in the style of a board-certified nephrologist using the following inputs:
+
+**Reason for Consultation:**
+{reason}
+
+**Presenting Symptoms:**
+{symptoms}
+
+**Clinical History & Context:**
+{context_history}
+
+**Labs:**
+{labs}
+
+**Assessment & Plan (Targeted):**
+{assessment_plan_input}
+
+Based on the above, generate a note that includes:
+1. **Reason for Consultation:** Restate the consultation reason.
+2. **History of Present Illness (HPI):** Provide a concise narrative summarizing the presenting symptoms, clinical history & context, and labs.
+3. **Assessment and Plan:** For each problem mentioned in the 'Assessment & Plan' input, elaborate a brief assessment using clinical details from the HPI and then integrate the corresponding targeted treatment options.
+Do not add any extra summary sections.
+"""
+            with st.spinner("Generating Consultation Note..."):
+                response = openai.Completion.create(
+                    model="deepseek-chat",
+                    prompt=prompt,
+                    max_tokens=1200,
+                    temperature=0.7,
+                )
+                generated_note = response.choices[0].text.strip()
+                patient_record["consultation_note"] = generated_note
+                patient_record["note_type"] = "Consult"
+                patient_record["last_updated"] = str(datetime.datetime.now())
+                st.success("Consultation note generated and saved!")
+                st.text_area("Consultation Note:", value=generated_note, height=400)
+
+    with tab2:
+        st.subheader("Generate SOAP Note")
+        case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150, key="case_update")
+        if st.button("Generate SOAP Note"):
+            if not patient_record.get("consultation_note"):
+                st.error("Please generate a consultation note first.")
+            else:
+                soap_prompt = f"""
+Using the following consultation note and case update, generate a SOAP note for a progress note in the style of a board-certified nephrologist.
+In the SOAP note:
+- **Subjective:** Provide a concise statement of the patient's current condition using the case update.
+- **Assessment and Plan:** Reflect the problem list and treatment options as provided in the consultation note.
+- **Objective:** Omit this section.
+
+Consultation Note:
+{patient_record.get("consultation_note")}
+
+Case Update:
+{case_update}
+
+SOAP Note:
+"""
+                with st.spinner("Generating SOAP Note..."):
+                    response = openai.Completion.create(
+                        model="deepseek-chat",
+                        prompt=soap_prompt,
+                        max_tokens=800,
+                        temperature=0.7,
+                    )
+                    soap_note = response.choices[0].text.strip()
+                    patient_record["soap_note"] = soap_note
+                    patient_record["note_type"] = "Progress"
+                    patient_record["last_updated"] = str(datetime.datetime.now())
+                    st.success("SOAP note generated and saved!")
+                    st.text_area("SOAP Note:", value=soap_note, height=400)
+
+    with tab3:
+        st.subheader("Generate Follow-Up Update")
+        new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=50, key="new_update")
+        if st.button("Generate Follow-Up Note"):
+            if patient_record.get("soap_note"):
+                base_note = patient_record.get("soap_note")
+            else:
+                base_note = patient_record.get("consultation_note")
+            followup_prompt = f"""
+Using the following previous note and a new update, generate an updated follow-up SOAP note for a progress note in the style of a board-certified nephrologist.
+
+Previous Note:
+{base_note}
+
+New Update:
+{new_update}
+
+Generate an updated SOAP note that integrates the new subjective information with the existing assessment and plan.
+"""
+            with st.spinner("Generating Follow-Up Note..."):
+                response = openai.Completion.create(
+                    model="deepseek-chat",
+                    prompt=followup_prompt,
+                    max_tokens=800,
+                    temperature=0.7,
+                )
+                new_soap_note = response.choices[0].text.strip()
+                patient_record["soap_note"] = new_soap_note
+                patient_record["note_type"] = "Progress"
+                patient_record["last_updated"] = str(datetime.datetime.now())
+                st.success("Follow-Up note generated and saved!")
+                st.text_area("Updated Follow-Up SOAP Note:", value=new_soap_note, height=400)
+
+    # Button to save the patient record to S3 (persistent storage)
+    if st.button("Save Patient Record to S3"):
+        upload_patient_record_to_s3(patient_record)
+        st.json(patient_record)
