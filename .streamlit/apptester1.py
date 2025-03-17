@@ -193,7 +193,8 @@ SOAP Note:
 
     with tab3:
         st.subheader("Generate Follow-Up Update")
-        new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=50, key="new_update")
+        # Set height to 68 pixels instead of 50
+        new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=68, key="new_update")
         if st.button("Generate Follow-Up Note"):
             if patient_record.get("soap_note"):
                 base_note = patient_record.get("soap_note")
