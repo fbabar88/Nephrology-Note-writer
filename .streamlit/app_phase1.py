@@ -1,15 +1,38 @@
 import streamlit as st
 import openai
+import boto3
 import json
 import datetime
+import tempfile
 
-# Configure the OpenAI SDK for DeepSeek (Beta Endpoint)
-openai.api_base = "https://api.deepseek.com/beta"  # Use the beta endpoint
-openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "")  # Add your API key to Streamlit secrets
+# Configure OpenAI SDK for DeepSeek (Beta Endpoint)
+openai.api_base = "https://api.deepseek.com/beta"
+openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+
+# S3 integration functions
+def get_s3_client():
+    s3 = boto3.client(
+        's3',
+        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
+        region_name=st.secrets["AWS_DEFAULT_REGION"]
+    )
+    return s3
+
+def upload_patient_record_to_s3(record):
+    s3 = get_s3_client()
+    bucket = st.secrets["BUCKET_NAME"]
+    # Create a unique key for the record using patient ID and current timestamp
+    timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
+    file_key = f"patients/{record['id']}_{timestamp}.json"
+    # Convert the record to JSON string
+    record_json = json.dumps(record)
+    # Upload the JSON string to S3
+    s3.put_object(Body=record_json, Bucket=bucket, Key=file_key)
+    st.success(f"Patient record saved to S3 with key: {file_key}")
 
 # Initialize or load patient data in session state
 if "patients" not in st.session_state:
-    # Simulated patient records; later replace with persistent storage/database
     st.session_state.patients = [
         {
             "id": "AB",
@@ -49,7 +72,6 @@ new_reason = st.sidebar.text_input("Reason for Consult", key="new_reason")
 new_note_type = st.sidebar.selectbox("Note Type", ["Consult", "Progress"], key="new_note_type")
 if st.sidebar.button("Add Patient"):
     if new_patient_id and new_reason:
-        # Create a new patient record with default empty notes
         new_patient = {
             "id": new_patient_id,
             "note_type": new_note_type,
@@ -60,7 +82,6 @@ if st.sidebar.button("Add Patient"):
         }
         st.session_state.patients.append(new_patient)
         st.sidebar.success(f"Patient {new_patient_id} added successfully!")
-        # Refresh the selectbox by updating the session state (simulate a refresh)
         st.experimental_rerun()
     else:
         st.sidebar.error("Please enter both Patient ID and Reason for Consult.")
@@ -75,8 +96,8 @@ if selected_patient:
     st.write(f"**Reason for Consult:** {patient_record['reason']}")
     st.write(f"**Last Updated:** {patient_record.get('last_updated', 'N/A')}")
 
-    # Create tabs for Consultation Note and SOAP Note
-    tab1, tab2 = st.tabs(["Consultation Note", "SOAP Note"])
+    # Create tabs for Consultation Note, SOAP Note, and Follow-Up Update
+    tab1, tab2, tab3 = st.tabs(["Consultation Note", "SOAP Note", "Follow-Up Update"])
 
     with tab1:
         st.subheader("Generate Consultation Note")
@@ -95,7 +116,6 @@ if selected_patient:
             height=150,
             key="assessment"
         )
-
         if st.button("Generate Consultation Note"):
             prompt = f"""
 Generate a comprehensive Epic consultation note in the style of a board-certified nephrologist using the following inputs:
@@ -129,7 +149,6 @@ Do not add any extra summary sections.
                     temperature=0.7,
                 )
                 generated_note = response.choices[0].text.strip()
-                # Save the generated consultation note in the patient record
                 patient_record["consultation_note"] = generated_note
                 patient_record["note_type"] = "Consult"
                 patient_record["last_updated"] = str(datetime.datetime.now())
@@ -139,7 +158,6 @@ Do not add any extra summary sections.
     with tab2:
         st.subheader("Generate SOAP Note")
         case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150, key="case_update")
-
         if st.button("Generate SOAP Note"):
             if not patient_record.get("consultation_note"):
                 st.error("Please generate a consultation note first.")
@@ -167,15 +185,47 @@ SOAP Note:
                         temperature=0.7,
                     )
                     soap_note = response.choices[0].text.strip()
-                    # Save the generated SOAP note in the patient record
                     patient_record["soap_note"] = soap_note
                     patient_record["note_type"] = "Progress"
                     patient_record["last_updated"] = str(datetime.datetime.now())
                     st.success("SOAP note generated and saved!")
                     st.text_area("SOAP Note:", value=soap_note, height=400)
 
-    # Button to "Save" patient record (simulate persistence)
-    if st.button("Save Patient Record"):
-        # In a real-world scenario, save to a database or persistent storage
-        st.success("Patient record saved!")
+    with tab3:
+        st.subheader("Generate Follow-Up Update")
+        # Set height to 68 pixels instead of 50
+        new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=68, key="new_update")
+        if st.button("Generate Follow-Up Note"):
+            if patient_record.get("soap_note"):
+                base_note = patient_record.get("soap_note")
+            else:
+                base_note = patient_record.get("consultation_note")
+            followup_prompt = f"""
+Using the following previous note and a new update, generate an updated follow-up SOAP note for a progress note in the style of a board-certified nephrologist.
+
+Previous Note:
+{base_note}
+
+New Update:
+{new_update}
+
+Generate an updated SOAP note that integrates the new subjective information with the existing assessment and plan.
+"""
+            with st.spinner("Generating Follow-Up Note..."):
+                response = openai.Completion.create(
+                    model="deepseek-chat",
+                    prompt=followup_prompt,
+                    max_tokens=800,
+                    temperature=0.7,
+                )
+                new_soap_note = response.choices[0].text.strip()
+                patient_record["soap_note"] = new_soap_note
+                patient_record["note_type"] = "Progress"
+                patient_record["last_updated"] = str(datetime.datetime.now())
+                st.success("Follow-Up note generated and saved!")
+                st.text_area("Updated Follow-Up SOAP Note:", value=new_soap_note, height=400)
+
+    # Button to save the patient record to S3 (persistent storage)
+    if st.button("Save Patient Record to S3"):
+        upload_patient_record_to_s3(patient_record)
         st.json(patient_record)
