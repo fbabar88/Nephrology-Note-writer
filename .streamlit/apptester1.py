@@ -89,7 +89,7 @@ st.sidebar.title("Active Patients")
 patient_options = [
     f"{p['id']} - {p['note_type']} - {p['reason']}" for p in st.session_state.patients
 ]
-selected_patient = st.sidebar.selectbox("Select a patient", patient_options)
+selected_patient = st.sidebar.selectbox("Select a patient", patient_options, key="patient_select")
 
 # Add New Patient Section
 st.sidebar.markdown("---")
@@ -97,7 +97,7 @@ st.sidebar.subheader("Add New Patient")
 new_patient_id = st.sidebar.text_input("Patient ID/Initials", key="new_id")
 new_reason = st.sidebar.text_input("Reason for Consult", key="new_reason")
 new_note_type = st.sidebar.selectbox("Note Type", ["Consult", "Progress"], key="new_note_type")
-if st.sidebar.button("Add Patient"):
+if st.sidebar.button("Add Patient", key="add_patient"):
     if new_patient_id and new_reason:
         new_patient = {
             "id": new_patient_id,
@@ -124,7 +124,7 @@ if selected_patient:
     st.write(f"**Last Updated:** {patient_record.get('last_updated', 'N/A')}")
 
     # Button to load the latest record from S3 for this patient
-    if st.button("Load Latest Patient Record from S3"):
+    if st.button("Load Latest Patient Record from S3", key="load_s3"):
         loaded_record = load_latest_patient_record_from_s3(patient_record['id'])
         if loaded_record:
             st.session_state.current_patient = loaded_record
@@ -140,7 +140,7 @@ if selected_patient:
     with tab1:
         st.subheader("Generate Consultation Note")
         # Pre-populate the reason from the patient record
-        reason = st.text_input("Reason for Consultation:", patient_record["reason"], key="reason")
+        reason = st.text_input("Reason for Consultation:", patient_record["reason"], key="reason_input")
         symptoms = st.text_area("Presenting Symptoms:", "", height=80, key="symptoms")
         context_history = st.text_area("Clinical History & Context:", "", height=80, key="context")
         labs = st.text_area("Labs:", "", height=80, key="labs")
@@ -152,9 +152,9 @@ if selected_patient:
             "Metabolic Acidosis: Monitor acid-base status, administer bicarbonate if pH < 7.2.\n"
             "Cardiogenic Shock: Adjust pressor support and collaborate with cardiology.",
             height=150,
-            key="assessment"
+            key="assessment_input"
         )
-        if st.button("Generate Consultation Note"):
+        if st.button("Generate Consultation Note", key="generate_consult"):
             prompt = f"""
 Generate a comprehensive Epic consultation note in the style of a board-certified nephrologist using the following inputs:
 
@@ -187,18 +187,17 @@ Do not add any extra summary sections.
                     temperature=0.7,
                 )
                 generated_note = response.choices[0].text.strip()
-                # Remove leading asterisks from the generated note
                 generated_note = remove_leading_asterisks(generated_note)
                 patient_record["consultation_note"] = generated_note
                 patient_record["note_type"] = "Consult"
                 patient_record["last_updated"] = str(datetime.datetime.now())
                 st.success("Consultation note generated and saved!")
-                st.text_area("Consultation Note:", value=generated_note, height=400)
+                st.text_area("Consultation Note:", value=generated_note, height=400, key="consult_note_display")
 
     with tab2:
         st.subheader("Generate SOAP Note")
-        case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150, key="case_update")
-        if st.button("Generate SOAP Note"):
+        case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150, key="case_update_input")
+        if st.button("Generate SOAP Note", key="generate_soap"):
             if not patient_record.get("consultation_note"):
                 st.error("Please generate a consultation note first.")
             else:
@@ -225,19 +224,17 @@ SOAP Note:
                         temperature=0.7,
                     )
                     soap_note = response.choices[0].text.strip()
-                    # Clean up the generated SOAP note
                     soap_note = remove_leading_asterisks(soap_note)
                     patient_record["soap_note"] = soap_note
                     patient_record["note_type"] = "Progress"
                     patient_record["last_updated"] = str(datetime.datetime.now())
                     st.success("SOAP note generated and saved!")
-                    st.text_area("SOAP Note:", value=soap_note, height=400)
+                    st.text_area("SOAP Note:", value=soap_note, height=400, key="soap_note_display")
 
     with tab3:
         st.subheader("Generate Follow-Up Update")
-        # Set height to 68 pixels instead of 50 for the new update field
-        new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=68, key="new_update")
-        if st.button("Generate Follow-Up Note"):
+        new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=68, key="new_update_input")
+        if st.button("Generate Follow-Up Note", key="generate_followup"):
             if patient_record.get("soap_note"):
                 base_note = patient_record.get("soap_note")
             else:
@@ -261,20 +258,14 @@ Generate an updated SOAP note that integrates the new subjective information wit
                     temperature=0.7,
                 )
                 new_soap_note = response.choices[0].text.strip()
-                # Clean the follow-up note by removing leading asterisks
                 new_soap_note = remove_leading_asterisks(new_soap_note)
                 patient_record["soap_note"] = new_soap_note
                 patient_record["note_type"] = "Progress"
                 patient_record["last_updated"] = str(datetime.datetime.now())
                 st.success("Follow-Up note generated and saved!")
-                st.text_area("Updated Follow-Up SOAP Note:", value=new_soap_note, height=400)
+                st.text_area("Updated Follow-Up SOAP Note:", value=new_soap_note, height=400, key="followup_display")
 
     # Button to save the patient record to S3 (persistent storage)
-    if st.button("Save Patient Record to S3"):
-        upload_patient_record_to_s3(patient_record)
-        st.json(patient_record)
-
-    # Button to save the patient record to S3 (persistent storage)
-    if st.button("Save Patient Record to S3"):
+    if st.button("Save Patient Record to S3", key="save_patient_record"):
         upload_patient_record_to_s3(patient_record)
         st.json(patient_record)
