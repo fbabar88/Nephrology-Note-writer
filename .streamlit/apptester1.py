@@ -4,10 +4,16 @@ import boto3
 import json
 import datetime
 import tempfile
+import re
 
 # Configure OpenAI SDK for DeepSeek (Beta Endpoint)
 openai.api_base = "https://api.deepseek.com/beta"
 openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+
+# Helper function to remove leading asterisks from each line
+def remove_leading_asterisks(text):
+    cleaned_lines = [re.sub(r"^\s*\*\s*", "", line) for line in text.splitlines()]
+    return "\n".join(cleaned_lines)
 
 # S3 integration functions
 def get_s3_client():
@@ -121,7 +127,6 @@ if selected_patient:
     if st.button("Load Latest Patient Record from S3"):
         loaded_record = load_latest_patient_record_from_s3(patient_record['id'])
         if loaded_record:
-            # Update session state and local patient record with loaded data
             st.session_state.current_patient = loaded_record
             patient_record.update(loaded_record)
             st.success("Patient record loaded from S3.")
@@ -182,6 +187,8 @@ Do not add any extra summary sections.
                     temperature=0.7,
                 )
                 generated_note = response.choices[0].text.strip()
+                # Remove leading asterisks from the generated note
+                generated_note = remove_leading_asterisks(generated_note)
                 patient_record["consultation_note"] = generated_note
                 patient_record["note_type"] = "Consult"
                 patient_record["last_updated"] = str(datetime.datetime.now())
@@ -218,6 +225,8 @@ SOAP Note:
                         temperature=0.7,
                     )
                     soap_note = response.choices[0].text.strip()
+                    # Clean up the generated SOAP note
+                    soap_note = remove_leading_asterisks(soap_note)
                     patient_record["soap_note"] = soap_note
                     patient_record["note_type"] = "Progress"
                     patient_record["last_updated"] = str(datetime.datetime.now())
@@ -252,11 +261,18 @@ Generate an updated SOAP note that integrates the new subjective information wit
                     temperature=0.7,
                 )
                 new_soap_note = response.choices[0].text.strip()
+                # Clean the follow-up note by removing leading asterisks
+                new_soap_note = remove_leading_asterisks(new_soap_note)
                 patient_record["soap_note"] = new_soap_note
                 patient_record["note_type"] = "Progress"
                 patient_record["last_updated"] = str(datetime.datetime.now())
                 st.success("Follow-Up note generated and saved!")
                 st.text_area("Updated Follow-Up SOAP Note:", value=new_soap_note, height=400)
+
+    # Button to save the patient record to S3 (persistent storage)
+    if st.button("Save Patient Record to S3"):
+        upload_patient_record_to_s3(patient_record)
+        st.json(patient_record)
 
     # Button to save the patient record to S3 (persistent storage)
     if st.button("Save Patient Record to S3"):
