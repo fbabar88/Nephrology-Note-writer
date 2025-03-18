@@ -31,6 +31,27 @@ def upload_patient_record_to_s3(record):
     s3.put_object(Body=record_json, Bucket=bucket, Key=file_key)
     st.success(f"Patient record saved to S3 with key: {file_key}")
 
+def load_latest_patient_record_from_s3(patient_id):
+    s3 = get_s3_client()
+    bucket = st.secrets["BUCKET_NAME"]
+    # Use a prefix that matches the patient records (e.g., "patients/AB_")
+    prefix = f"patients/{patient_id}_"
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    
+    if 'Contents' not in response:
+        st.warning("No records found for this patient in S3.")
+        return None
+
+    # Sort the objects by LastModified (descending order) and pick the latest file
+    objects = sorted(response['Contents'], key=lambda obj: obj['LastModified'], reverse=True)
+    latest_key = objects[0]['Key']
+    
+    # Retrieve the object from S3
+    obj = s3.get_object(Bucket=bucket, Key=latest_key)
+    content = obj['Body'].read().decode('utf-8')
+    record = json.loads(content)
+    return record
+
 # Initialize or load patient data in session state
 if "patients" not in st.session_state:
     st.session_state.patients = [
@@ -86,7 +107,7 @@ if st.sidebar.button("Add Patient"):
     else:
         st.sidebar.error("Please enter both Patient ID and Reason for Consult.")
 
-# Load the selected patient record
+# Load the selected patient record from session state
 if selected_patient:
     selected_id = selected_patient.split(" - ")[0]
     patient_record = next((p for p in st.session_state.patients if p["id"] == selected_id), None)
@@ -95,6 +116,18 @@ if selected_patient:
     st.header(f"Patient {patient_record['id']} - {patient_record['note_type']}")
     st.write(f"**Reason for Consult:** {patient_record['reason']}")
     st.write(f"**Last Updated:** {patient_record.get('last_updated', 'N/A')}")
+
+    # Button to load the latest record from S3 for this patient
+    if st.button("Load Latest Patient Record from S3"):
+        loaded_record = load_latest_patient_record_from_s3(patient_record['id'])
+        if loaded_record:
+            # Update session state and local patient record with loaded data
+            st.session_state.current_patient = loaded_record
+            patient_record.update(loaded_record)
+            st.success("Patient record loaded from S3.")
+            st.json(patient_record)
+        else:
+            st.info("No record found in S3 for this patient.")
 
     # Create tabs for Consultation Note, SOAP Note, and Follow-Up Update
     tab1, tab2, tab3 = st.tabs(["Consultation Note", "SOAP Note", "Follow-Up Update"])
@@ -193,7 +226,7 @@ SOAP Note:
 
     with tab3:
         st.subheader("Generate Follow-Up Update")
-        # Set height to 68 pixels instead of 50
+        # Set height to 68 pixels instead of 50 for the new update field
         new_update = st.text_area("Enter New Update:", "Provide a one-liner update...", height=68, key="new_update")
         if st.button("Generate Follow-Up Note"):
             if patient_record.get("soap_note"):
