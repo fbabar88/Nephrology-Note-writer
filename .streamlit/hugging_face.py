@@ -1,10 +1,13 @@
+import os
+os.environ["STREAMLIT_WATCH_FILES"] = "false"
+
 import streamlit as st
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 import boto3
 import json
 import datetime
 import tempfile
 import re
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 
 # Helper function to remove leading asterisks from each line
 def remove_leading_asterisks(text):
