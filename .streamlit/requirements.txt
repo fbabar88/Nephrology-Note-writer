@@ -3,4 +3,5 @@ openai
 openai==0.28
 requests
 boto3
+transformers
 
