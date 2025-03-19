@@ -15,7 +15,6 @@ def remove_leading_asterisks(text):
     return "\n".join(cleaned_lines)
 
 # Initialize Hugging Face model (using GPT-2 for example)
-@st.cache_resource
 def load_huggingface_model():
     model_name = "gpt2"  # You can choose any other model from Hugging Face hub
     tokenizer = AutoTokenizer.from_pretrained(model_name)
