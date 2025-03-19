@@ -1,7 +1,7 @@
 streamlit
 openai
 openai==0.28
-torch==2.0.1
+torch==2.6.0
 transformers
 boto3
 
