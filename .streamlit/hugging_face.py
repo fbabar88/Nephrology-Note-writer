@@ -2,21 +2,21 @@ import os
 os.environ["STREAMLIT_WATCH_FILES"] = "false"
 
 import streamlit as st
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 import boto3
 import json
 import datetime
 import tempfile
 import re
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 
 # Helper function to remove leading asterisks from each line
 def remove_leading_asterisks(text):
     cleaned_lines = [re.sub(r"^\s*\*\s*", "", line) for line in text.splitlines()]
     return "\n".join(cleaned_lines)
 
-# Initialize Hugging Face model (using GPT-2 for example)
+# Load Hugging Face model without caching
 def load_huggingface_model():
-    model_name = "gpt2"  # You can choose any other model from Hugging Face hub
+    model_name = "gpt2"  # You can change this to a model that suits your needs
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
     generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
@@ -24,7 +24,7 @@ def load_huggingface_model():
 
 generator = load_huggingface_model()
 
-# S3 integration functions
+# S3 integration functions (unchanged)
 def get_s3_client():
     s3 = boto3.client(
         's3',
@@ -59,6 +59,9 @@ def load_latest_patient_record_from_s3(patient_id):
     content = obj['Body'].read().decode('utf-8')
     record = json.loads(content)
     return record
+
+# Rest of your app code remains unchanged...
+# (Patient management, tabs for note generation, etc.)
 
 # Initialize or load patient data in session state
 if "patients" not in st.session_state:
