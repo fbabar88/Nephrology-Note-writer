@@ -174,8 +174,8 @@ if st.button("Generate Progress Note", key="generate_note"):
                 response = openai.Completion.create(
                     model="deepseek-chat",
                     prompt=prompt,
-                    max_tokens=600,
-                    temperature=0.5,
+                    max_tokens=500,
+                    temperature=0.4,
                 )
                 generated_note = response.choices[0].text.strip()
                 st.subheader("Generated Progress Note")
