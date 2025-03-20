@@ -31,19 +31,15 @@ def get_s3_client():
 def upload_patient_record_to_s3(record):
     s3 = get_s3_client()
     bucket = st.secrets["BUCKET_NAME"]
-    # Create a unique key for the record using patient ID and current timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
     file_key = f"patients/{record['id']}_{timestamp}.json"
-    # Convert the record to JSON string
     record_json = json.dumps(record)
-    # Upload the JSON string to S3
     s3.put_object(Body=record_json, Bucket=bucket, Key=file_key)
     st.success(f"Patient record saved to S3 with key: {file_key}")
 
 def load_latest_patient_record_from_s3(patient_id):
     s3 = get_s3_client()
     bucket = st.secrets["BUCKET_NAME"]
-    # Use a prefix that matches the patient records (e.g., "patients/AB_")
     prefix = f"patients/{patient_id}_"
     response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     
@@ -51,15 +47,26 @@ def load_latest_patient_record_from_s3(patient_id):
         st.warning("No records found for this patient in S3.")
         return None
 
-    # Sort the objects by LastModified (descending order) and pick the latest file
     objects = sorted(response['Contents'], key=lambda obj: obj['LastModified'], reverse=True)
     latest_key = objects[0]['Key']
-    
-    # Retrieve the object from S3
     obj = s3.get_object(Bucket=bucket, Key=latest_key)
     content = obj['Body'].read().decode('utf-8')
     record = json.loads(content)
     return record
+
+def list_patient_records_from_s3(patient_id):
+    s3 = get_s3_client()
+    bucket = st.secrets["BUCKET_NAME"]
+    prefix = f"patients/{patient_id}_"
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    records = []
+    if 'Contents' in response:
+        for obj in response['Contents']:
+            key = obj['Key']
+            last_modified = obj['LastModified']
+            label = f"{key} ({last_modified.strftime('%Y-%m-%d %H:%M:%S')})"
+            records.append((label, key))
+    return records
 
 # Initialize or load patient data in session state
 if "patients" not in st.session_state:
@@ -87,14 +94,9 @@ if "current_patient" not in st.session_state:
 
 # Sidebar: Active Patients List and Add New Patient
 st.sidebar.title("Active Patients")
-
-# Display active patient list
-patient_options = [
-    f"{p['id']} - {p['note_type']} - {p['reason']}" for p in st.session_state.patients
-]
+patient_options = [f"{p['id']} - {p['note_type']} - {p['reason']}" for p in st.session_state.patients]
 selected_patient = st.sidebar.selectbox("Select a patient", patient_options, key="patient_select")
 
-# Add New Patient Section
 st.sidebar.markdown("---")
 st.sidebar.subheader("Add New Patient")
 new_patient_id = st.sidebar.text_input("Patient ID/Initials", key="new_id")
@@ -116,7 +118,7 @@ if st.sidebar.button("Add Patient", key="add_patient"):
     else:
         st.sidebar.error("Please enter both Patient ID and Reason for Consult.")
 
-# Load the selected patient record from session state
+# Main area: If a patient is selected, load the record and show note-generation tabs
 if selected_patient:
     selected_id = selected_patient.split(" - ")[0]
     patient_record = next((p for p in st.session_state.patients if p["id"] == selected_id), None)
@@ -126,23 +128,41 @@ if selected_patient:
     st.write(f"**Reason for Consult:** {patient_record['reason']}")
     st.write(f"**Last Updated:** {patient_record.get('last_updated', 'N/A')}")
 
-    # Button to load the latest record from S3 for this patient
+    # Section: Load Latest Record
     if st.button("Load Latest Patient Record from S3", key="load_s3"):
         loaded_record = load_latest_patient_record_from_s3(patient_record['id'])
         if loaded_record:
             st.session_state.current_patient = loaded_record
             patient_record.update(loaded_record)
-            st.success("Patient record loaded from S3.")
+            st.success("Patient record loaded from S3 (latest).")
             st.json(patient_record)
         else:
             st.info("No record found in S3 for this patient.")
 
-    # Create tabs for Consultation Note, SOAP Note, and Follow-Up Update
+    # Section: Retrieve Specific Record from S3
+    records = list_patient_records_from_s3(patient_record['id'])
+    if records:
+        st.markdown("#### Retrieve Specific Saved Record")
+        record_options = [label for (label, key) in records]
+        selected_record_label = st.selectbox("Select a record to load from S3:", record_options, key="select_record")
+        selected_record_key = None
+        for label, key in records:
+            if label == selected_record_label:
+                selected_record_key = key
+                break
+        if st.button("Load Selected Record", key="load_selected"):
+            s3 = get_s3_client()
+            obj = s3.get_object(Bucket=st.secrets["BUCKET_NAME"], Key=selected_record_key)
+            content = obj['Body'].read().decode('utf-8')
+            loaded_record = json.loads(content)
+            st.success("Loaded selected patient record from S3.")
+            st.json(loaded_record)
+
+    # Create tabs for note generation
     tab1, tab2, tab3 = st.tabs(["Consultation Note", "SOAP Note", "Follow-Up Update"])
 
     with tab1:
         st.subheader("Generate Consultation Note")
-        # Pre-populate the reason from the patient record
         reason = st.text_input("Reason for Consultation:", patient_record["reason"], key="reason_input")
         symptoms = st.text_area("Presenting Symptoms:", "", height=80, key="symptoms")
         context_history = st.text_area("Clinical History & Context:", "", height=80, key="context")
@@ -196,7 +216,32 @@ Do not add any extra summary sections.
                 patient_record["last_updated"] = str(datetime.datetime.now())
                 st.success("Consultation note generated and saved!")
                 st.text_area("Consultation Note:", value=generated_note, height=400, key="consult_note_display")
+        
+        # Default ROS & Physical Exam template for Initial Consultation
+        default_ros_pe_initial = """**Review of Systems (Nephrology Focused):**
 
+- **Constitutional:** Patient reports fatigue, weakness, and unintentional weight loss. Denies fever or chills.
+- **Cardiovascular:** Denies chest pain or palpitations; mild bilateral lower extremity edema present.
+- **Respiratory:** Lungs are clear to auscultation.
+- **Gastrointestinal:** Reports nausea, vomiting, and diarrhea for 5 days.
+- **Genitourinary:** Reports decreased urine output and dark, concentrated urine.
+- **Neurological:** Denies headache, dizziness, or altered mental status.
+- **Endocrine:** Denies polyuria, polydipsia, or appetite changes.
+- **Musculoskeletal:** No joint pain or significant weakness.
+
+**Physical Exam (Initial Consultation):**
+
+- **General:** Patient is alert, oriented, and appears mildly distressed.
+- **HEENT:** Normocephalic, atraumatic; pupils equal, round, reactive.
+- **Cardiovascular:** Regular rhythm; no murmurs; peripheral pulses palpable; mild bilateral lower extremity edema.
+- **Respiratory:** Lungs clear bilaterally.
+- **Abdomen:** Soft, non-tender, non-distended; no hepatosplenomegaly.
+- **Extremities:** No joint swelling or deformities.
+- **Skin:** Warm, dry, intact; no rashes or lesions.
+- **Neurological:** Cranial nerves grossly intact; normal motor strength and sensation.
+"""
+        ros_pe_initial = st.text_area("Review of Systems and Physical Exam (Initial Consultation):", value=default_ros_pe_initial, height=300, key="ros_pe_initial")
+    
     with tab2:
         st.subheader("Generate SOAP Note")
         case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150, key="case_update_input")
@@ -231,7 +276,7 @@ Case Update:
                     patient_record["last_updated"] = str(datetime.datetime.now())
                     st.success("SOAP note generated and saved!")
                     st.text_area("SOAP Note:", value=soap_note, height=400, key="soap_note_display")
-
+        
     with tab3:
         st.subheader("Generate Follow-Up Update")
         new_update = st.text_area("Enter New Update (one-liner):", "Provide a one-liner update...", height=68, key="new_update_input")
@@ -270,7 +315,7 @@ Generate an updated SOAP note that reflects only the new update in the Subjectiv
                 patient_record["last_updated"] = str(datetime.datetime.now())
                 st.success("Follow-Up note generated and saved!")
                 st.text_area("Updated Follow-Up SOAP Note:", value=new_soap_note, height=400, key="followup_display")
-
+        
     if st.button("Save Patient Record to S3", key="save_patient_record"):
         upload_patient_record_to_s3(patient_record)
         st.json(patient_record)
