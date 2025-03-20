@@ -1,27 +1,13 @@
 import streamlit as st
-st.write("Streamlit version:", st.__version__)
 import openai
 import datetime
 import time
-import json
 
 # --------------------------
 # Configure the DeepSeek API using the beta endpoint and lower temperature
 # --------------------------
 openai.api_base = "https://api.deepseek.com/beta"
 openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "YOUR_API_KEY")
-
-# --------------------------
-# Function to fetch guideline data from a local JSON file
-# --------------------------
-def fetch_guidelines(condition_key):
-    try:
-        with open("guidelines.json", "r") as file:
-            guidelines_data = json.load(file)
-        return guidelines_data.get(condition_key, "No guideline information available.")
-    except Exception as e:
-        st.error(f"Error loading guidelines file: {e}")
-        return ""
 
 # --------------------------
 # Final Instruction for Note Generation
@@ -33,11 +19,9 @@ final_instruction = (
     "Ensure that the final note is evidence-based."
 )
 
-# --------------------------
-# Sidebar: Timer, Visit Type, Condition Selection, and Reset Button
-# --------------------------
 st.title("Nephrology Note Generator - Multi-Condition Interface")
 
+# Sidebar: Timer, Visit Type, Condition Selection, and Reset Button
 if st.sidebar.button("Start Timer"):
     st.session_state.start_time = time.time()
     st.sidebar.write("Timer started!")
@@ -47,48 +31,24 @@ if "start_time" in st.session_state:
     st.sidebar.write(f"Time since start: {elapsed:.2f} seconds")
 
 visit_type = st.sidebar.radio("Select Visit Type", options=["New Patient", "Follow-Up"], key="visit_type")
-st.sidebar.write("Visit Type:", visit_type)
-
 condition = st.sidebar.selectbox(
     "Select Condition",
     options=["CKD", "Hypertension", "Glomerulonephritis", "Hyponatremia", "Hypokalemia", "Proteinuria & Hematuria", "Renal Cyst"],
     key="condition"
 )
-st.sidebar.write("Selected Condition:", condition)
 
-# Reset Form button clears session state so that all inputs are cleared.
 if st.sidebar.button("Reset Form"):
     st.session_state.clear()
-    if hasattr(st, "experimental_rerun"):
-        st.experimental_rerun()
-    else:
-        st.error("Your Streamlit version does not support experimental_rerun. Please update Streamlit.")
+    st.experimental_rerun()
 
-# Map condition to guideline key (for CKD, use different keys based on visit type)
-guideline_keys = {
-    "CKD": "KDIGO_CKD" if visit_type == "New Patient" else "KDIGO_CKD_FollowUp",
-    "Hypertension": "AHA_HTN",
-    "Glomerulonephritis": "ANCA_Vasculitis",
-    "Hyponatremia": "Hyponatremia_Treatment",
-    "Hypokalemia": "Hypokalemia",
-    "Proteinuria & Hematuria": "Proteinuria_Hematuria",
-    "Renal Cyst": "Renal_Cyst"
-}
-selected_guideline_key = guideline_keys.get(condition, "")
-
-# Get today's date
-visit_date = datetime.date.today().strftime("%B %d, %Y")
-
-# --------------------------
-# Main Interface: Select Input Mode
-# --------------------------
 st.header(f"{condition} Progress Note")
 
+# --------------------------
 # Choose between Structured Input and Free Text modes
+# --------------------------
 input_mode = st.radio("Select Input Mode", options=["Structured Input", "Free Text"], key="input_mode")
 
 if input_mode == "Structured Input":
-    # Structured input for each field
     if condition == "CKD":
         if visit_type == "New Patient":
             reason_for_visit = st.text_input("Reason for Visit", "CKD Evaluation", key="ckd_new_reason")
@@ -101,7 +61,7 @@ if input_mode == "Structured Input":
             additional_details = st.text_area("Additional Comments (Optional)", "", key="ckd_new_extra")
             
             prompt = f"""
-Visit Date: {visit_date}
+Visit Date: {datetime.date.today().strftime("%B %d, %Y")}
 Reason for Visit: {reason_for_visit}
 [New Patient - CKD Evaluation]
 
@@ -116,8 +76,8 @@ Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
-"""
-        else:  # Follow-Up for CKD
+            """
+        else:
             reason_for_visit = st.text_input("Reason for Visit", "CKD Follow-Up", key="ckd_fu_reason")
             interval_history = st.text_area("Interval History", "Enter changes since last visit...", key="ckd_fu_interval")
             ckd_stage = st.selectbox("CKD Stage", options=["1", "2", "3", "4", "5"], index=2, key="ckd_fu_stage")
@@ -129,7 +89,7 @@ Assessment & Plan:
             additional_details = st.text_area("Additional Comments (Optional)", "", key="ckd_fu_extra")
             
             prompt = f"""
-Visit Date: {visit_date}
+Visit Date: {datetime.date.today().strftime("%B %d, %Y")}
 Reason for Visit: {reason_for_visit}
 [Follow-Up - CKD]
 
@@ -143,7 +103,7 @@ Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
-"""
+            """
     else:
         if visit_type == "New Patient":
             reason_for_visit = st.text_input("Reason for Visit", f"{condition} Evaluation", key=f"{condition}_new_reason")
@@ -153,7 +113,7 @@ Assessment & Plan:
             additional_comments = st.text_area("Additional Comments (Optional)", "", key=f"{condition}_new_extra")
             
             prompt = f"""
-Visit Date: {visit_date}
+Visit Date: {datetime.date.today().strftime("%B %d, %Y")}
 Reason for Visit: {reason_for_visit}
 
 Subjective:
@@ -165,7 +125,7 @@ Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
-"""
+            """
         else:
             reason_for_visit = st.text_input("Reason for Visit", f"{condition} Follow-Up", key=f"{condition}_fu_reason")
             interval_history = st.text_area("Interval History", "Enter interval history (changes since last visit)...", key=f"{condition}_fu_interval")
@@ -174,7 +134,7 @@ Assessment & Plan:
             additional_comments = st.text_area("Additional Comments (Optional)", "", key=f"{condition}_fu_extra")
             
             prompt = f"""
-Visit Date: {visit_date}
+Visit Date: {datetime.date.today().strftime("%B %d, %Y")}
 Reason for Visit: {reason_for_visit}
 
 Interval History: {interval_history}
@@ -185,23 +145,23 @@ Assessment & Plan:
 {assessment_plan}
 
 {final_instruction}
-"""
+            """
 else:
-    # Free Text Mode: Only one text area is shown
+    # Free Text Mode
     free_text_input = st.text_area("Enter your note details in free text", "Type your note here...", key="free_text")
     prompt = f"""
-Visit Date: {visit_date}
+Visit Date: {datetime.date.today().strftime("%B %d, %Y")}
 
 {free_text_input}
 
 {final_instruction}
-"""
+            """
 
-# Display the constructed prompt for review/debugging
+# Display the constructed prompt for review (for debugging)
 st.code(prompt, language="plaintext")
 
 # --------------------------
-# Button to generate note and load final note as editable text area with download option
+# Generate Note Button
 # --------------------------
 if st.button("Generate Progress Note", key="generate_note"):
     if "start_time" not in st.session_state:
@@ -209,14 +169,11 @@ if st.button("Generate Progress Note", key="generate_note"):
     else:
         elapsed = time.time() - st.session_state.start_time
         st.write(f"Time taken to input variables: {elapsed:.2f} seconds")
-        guidelines_text = fetch_guidelines(selected_guideline_key)
-        full_prompt = f"{prompt}\n\nGuideline Recommendations:\n{guidelines_text}"
-        st.code(full_prompt, language="plaintext")
         with st.spinner("Generating progress note..."):
             try:
                 response = openai.Completion.create(
                     model="deepseek-chat",
-                    prompt=full_prompt,
+                    prompt=prompt,
                     max_tokens=600,
                     temperature=0.5,
                 )
