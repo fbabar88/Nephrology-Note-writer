@@ -197,9 +197,11 @@ Generate a comprehensive Epic consultation note in the style of a board-certifie
 {assessment_plan_input}
 
 Based on the above, generate a note that includes:
-1. **Reason for Consultation:** Restate the consultation reason.
-2. **History of Present Illness (HPI):** Provide a concise narrative summarizing the presenting symptoms, clinical history & context, and labs.
-3. **Assessment and Plan:** For each problem mentioned in the 'Assessment & Plan' input, elaborate a brief assessment using clinical details from the HPI and then integrate the corresponding targeted treatment options.
+1. Reason for Consultation: Restate the consultation reason.
+2. History of Present Illness (HPI): Provide a concise narrative summarizing the presenting symptoms, clinical history & context, and labs.
+3. Assessment: List each problem mentioned in the 'Assessment & Plan' input as a heading.
+4. Plan: Consolidate all treatment recommendations into a single bullet-point list at the end of the note without any subheadings.
+
 Do not add any extra summary sections.
 """
             with st.spinner("Generating Consultation Note..."):
