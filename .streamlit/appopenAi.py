@@ -9,23 +9,20 @@ import re
 
 # ─── Configuration ───────────────────────────────────────────────────────────────
 
-# Use your OpenAI API key from a namespaced secret in `.streamlit/secrets.toml`:
-# [openai]
-# api_key = "sk-your-openai-api-key-here"
-openai.api_key = st.secrets["openai"]["api_key"]
+# Use your OpenAI API key from Streamlit secrets as OPENAI_API_KEY
+# In .streamlit/secrets.toml:
+# OPENAI_API_KEY = "sk-your-openai-api-key-here"
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Optionally let the user choose model in the sidebar:
 model_name = st.sidebar.selectbox(
-    "Choose model",
-    ["gpt-3.5-turbo", "gpt-4"],
-    index=1
+    "Choose model", ["gpt-3.5-turbo", "gpt-4"], index=1
 )
 
 # ─── Helpers ────────────────────────────────────────────────────────────────────
 
 def remove_leading_asterisks(text: str) -> str:
-    cleaned = [re.sub(r"^\s*\*\s*", "", line) for line in text.splitlines()]
-    return "\n".join(cleaned)
+    return "\n".join([re.sub(r"^\s*\*\s*", "", line) for line in text.splitlines()])
 
 # ─── Session State Initialization ───────────────────────────────────────────────
 
@@ -70,10 +67,8 @@ if sel:
     st.write(f"**Reason:** {record['reason']}")
     st.write(f"**Last Updated:** {record.get('last_updated')}")
 
-    # Note-generation tabs
     tab1, tab2, tab3 = st.tabs(["Consultation Note","SOAP Note","Follow‑Up"])
 
-    # ── Tab 1: Consultation Note ───────────────────────────────
     with tab1:
         st.subheader("Generate Consultation Note")
         reason = st.text_input("Reason:", record["reason"], key="reason_input")
@@ -87,39 +82,23 @@ if sel:
         )
         if st.button("Generate Consultation Note", key="gen_consult"):
             prompt = f"""
-Reason: {reason}
-
-Symptoms: {symptoms}
-
-History/Context: {history}
-
-Labs: {labs}
-
-Assessment & Plan:
-{assessment}
-"""
+Reason: {reason}\n\nSymptoms: {symptoms}\n\nHistory/Context: {history}\n\nLabs: {labs}\n\nAssessment & Plan:\n{assessment}\n"""
             with st.spinner("Generating…"):
                 resp = openai.ChatCompletion.create(
                     model=model_name,
                     messages=[
                         {"role":"system","content":"You are a board-certified nephrologist writing an Epic-style consultation note."},
                         {"role":"user","content":prompt}
-                    ],
-                    max_tokens=1200,
-                    temperature=0.5
+                    ], max_tokens=1200, temperature=0.5
                 )
-                note = remove_leading_asterisks(resp.choices[0].message.content.strip())
-                record["consultation_note"] = note
-                record["note_type"] = "Consult"
-                record["last_updated"] = str(datetime.datetime.now())
+                note = remove_leading_asterisks(resp.choices[0].message.content)
+                record.update({"consultation_note":note, "note_type":"Consult", "last_updated":str(datetime.datetime.now())})
                 st.success("Consultation note generated.")
                 st.text_area("Consultation Note:", note, height=400, key="consult_display")
 
-        default_ros_pe = """**Review of Systems:** …  
-**Physical Exam:** …"""
+        default_ros_pe = """**Review of Systems:** …  \n**Physical Exam:** …"""
         st.text_area("ROS & PE Template:", default_ros_pe, height=300, key="ros_pe_initial")
 
-    # ── Tab 2: SOAP Note ──────────────────────────────────────
     with tab2:
         st.subheader("Generate SOAP Note")
         update_txt = st.text_area("Case Update:", "Enter update here", height=150, key="case_update_input")
@@ -127,58 +106,37 @@ Assessment & Plan:
             if not record.get("consultation_note"):
                 st.error("Generate consult note first.")
             else:
-                soap_prompt = f"""
-Consultation Note:
-{record['consultation_note']}
-
-Case Update:
-{update_txt}
-"""
+                soap_prompt = f"""Consultation Note:\n{record['consultation_note']}\n\nCase Update:\n{update_txt}"""
                 with st.spinner("Generating…"):
                     resp = openai.ChatCompletion.create(
                         model=model_name,
                         messages=[
                             {"role":"system","content":"You are a nephrologist drafting a SOAP progress note."},
                             {"role":"user","content":soap_prompt}
-                        ],
-                        max_tokens=800,
-                        temperature=0.5
+                        ], max_tokens=800, temperature=0.5
                     )
-                    soap = remove_leading_asterisks(resp.choices[0].message.content.strip())
-                    record["soap_note"] = soap
-                    record["note_type"] = "Progress"
-                    record["last_updated"] = str(datetime.datetime.now())
+                    soap = remove_leading_asterisks(resp.choices[0].message.content)
+                    record.update({"soap_note":soap, "note_type":"Progress", "last_updated":str(datetime.datetime.now())})
                     st.success("SOAP note generated.")
                     st.text_area("SOAP Note:", soap, height=400, key="soap_display")
 
-    # ── Tab 3: Follow‑Up Update ────────────────────────────────
     with tab3:
         st.subheader("Generate Follow‑Up Update")
         one_liner = st.text_area("One‑line update:", "Enter update...", height=80, key="new_update_input")
-        if st.button("Generate Follow‑Up", key="gen_followup"):
+        if st.button("Generate Follow‑up", key="gen_followup"):
             base = record.get("soap_note") or record.get("consultation_note")
-            followup_prompt = f"""
-Previous Note:
-{base}
-
-One‑liner Update:
-{one_liner}
-"""
+            followup_prompt = f"""Previous Note:\n{base}\n\nOne‑liner Update:\n{one_liner}"""
             with st.spinner("Generating…"):
                 resp = openai.ChatCompletion.create(
                     model=model_name,
                     messages=[
                         {"role":"system","content":"You are a nephrologist updating a follow‑up SOAP note based on a one‑liner."},
                         {"role":"user","content":followup_prompt}
-                    ],
-                    max_tokens=600,
-                    temperature=0.5
+                    ], max_tokens=600, temperature=0.5
                 )
-                new_soap = remove_leading_asterisks(resp.choices[0].message.content.strip())
-                record["soap_note"] = new_soap
-                record["note_type"] = "Progress"
-                record["last_updated"] = str(datetime.datetime.now())
+                new_soap = remove_leading_asterisks(resp.choices[0].message.content)
+                record.update({"soap_note":new_soap, "note_type":"Progress", "last_updated":str(datetime.datetime.now())})
                 st.success("Follow‑up note generated.")
                 st.text_area("Updated SOAP Note:", new_soap, height=400, key="followup_display")
 
-# Note: AWS storage integration is deactivated for now.
+# AWS storage integration is deactivated for now.
