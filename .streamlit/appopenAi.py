@@ -3,15 +3,16 @@ os.environ["STREAMLIT_WATCH_FILES"] = "false"
 
 import streamlit as st
 import openai
-import boto3
 import json
 import datetime
 import re
 
 # ─── Configuration ───────────────────────────────────────────────────────────────
 
-# Use your OpenAI API key (set in Streamlit secrets as OPENAI_API_KEY)
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Use your OpenAI API key from a namespaced secret in `.streamlit/secrets.toml`:
+# [openai]
+# api_key = "sk-your-openai-api-key-here"
+openai.api_key = st.secrets["openai"]["api_key"]
 
 # Optionally let the user choose model in the sidebar:
 model_name = st.sidebar.selectbox(
@@ -25,46 +26,6 @@ model_name = st.sidebar.selectbox(
 def remove_leading_asterisks(text: str) -> str:
     cleaned = [re.sub(r"^\s*\*\s*", "", line) for line in text.splitlines()]
     return "\n".join(cleaned)
-
-def get_s3_client():
-    return boto3.client(
-        's3',
-        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
-        region_name=st.secrets["AWS_DEFAULT_REGION"]
-    )
-
-def upload_patient_record_to_s3(record):
-    s3 = get_s3_client()
-    bucket = st.secrets["BUCKET_NAME"]
-    ts = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
-    key = f"patients/{record['id']}_{ts}.json"
-    s3.put_object(Body=json.dumps(record), Bucket=bucket, Key=key)
-    st.success(f"Saved to S3: {key}")
-
-def load_latest_patient_record_from_s3(patient_id):
-    s3 = get_s3_client()
-    bucket = st.secrets["BUCKET_NAME"]
-    prefix = f"patients/{patient_id}_"
-    resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-    if 'Contents' not in resp:
-        st.warning("No S3 records found.")
-        return None
-    latest = sorted(resp['Contents'], key=lambda o: o['LastModified'], reverse=True)[0]
-    obj = s3.get_object(Bucket=bucket, Key=latest['Key'])
-    return json.loads(obj['Body'].read().decode())
-
-def list_patient_records_from_s3(patient_id):
-    s3 = get_s3_client()
-    bucket = st.secrets["BUCKET_NAME"]
-    prefix = f"patients/{patient_id}_"
-    resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-    records = []
-    if 'Contents' in resp:
-        for o in resp['Contents']:
-            label = f"{o['Key']} ({o['LastModified'].strftime('%Y-%m-%d %H:%M:%S')})"
-            records.append((label, o['Key']))
-    return records
 
 # ─── Session State Initialization ───────────────────────────────────────────────
 
@@ -109,28 +70,7 @@ if sel:
     st.write(f"**Reason:** {record['reason']}")
     st.write(f"**Last Updated:** {record.get('last_updated')}")
 
-    # Load from S3
-    if st.button("Load Latest from S3"):
-        loaded = load_latest_patient_record_from_s3(pid)
-        if loaded:
-            record.update(loaded)
-            st.success("Loaded latest record.")
-            st.json(record)
-
-    # Choose specific S3 record
-    recs = list_patient_records_from_s3(pid)
-    if recs:
-        st.markdown("#### Load Specific Saved Record")
-        labels = [lbl for lbl, _ in recs]
-        choice = st.selectbox("Which record?", labels, key="select_record")
-        if st.button("Load Selected"):
-            key = next(k for lbl,k in recs if lbl==choice)
-            obj = get_s3_client().get_object(Bucket=st.secrets["BUCKET_NAME"], Key=key)
-            loaded = json.loads(obj['Body'].read().decode())
-            record.update(loaded)
-            st.success("Loaded selected record.")
-            st.json(record)
-
+    # Note-generation tabs
     tab1, tab2, tab3 = st.tabs(["Consultation Note","SOAP Note","Follow‑Up"])
 
     # ── Tab 1: Consultation Note ───────────────────────────────
@@ -241,7 +181,4 @@ One‑liner Update:
                 st.success("Follow‑up note generated.")
                 st.text_area("Updated SOAP Note:", new_soap, height=400, key="followup_display")
 
-    # ── Save Back to S3 ───────────────────────────────────────
-    if st.button("Save to S3", key="save_patient_record"):
-        upload_patient_record_to_s3(record)
-        st.json(record)
+# Note: AWS storage integration is deactivated for now.
