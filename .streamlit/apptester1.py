@@ -9,10 +9,15 @@ import datetime
 import tempfile
 import re
 
-# Configure OpenAI SDK for DeepSeek (Beta Endpoint)
-openai.api_base = "https://api.deepseek.com/beta"
-openai.api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+# Use your OpenAI API key from Streamlit secrets as OPENAI_API_KEY
+# In .streamlit/secrets.toml:
+# OPENAI_API_KEY = "sk-your-openai-api-key-here"
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
+# Optionally let the user choose model in the sidebar:
+model_name = st.sidebar.selectbox(
+    "Choose model", ["gpt-3.5-turbo", "gpt-4"], index=1
+)
 # Helper function to remove leading asterisks from each line
 def remove_leading_asterisks(text):
     cleaned_lines = [re.sub(r"^\s*\*\s*", "", line) for line in text.splitlines()]
