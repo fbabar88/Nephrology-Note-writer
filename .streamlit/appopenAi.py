@@ -9,9 +9,9 @@ import datetime
 # Configure OpenAI API
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# System prompt for note formatting and lab integration
+# System prompt for note formatting, lab integration, diagnostic & therapeutic triggers
 SYSTEM_PROMPT = """
-You are a board-certified nephrology AI assistant. Always format notes exactly as below:
+You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below:
 
 **Reason for Consultation**  
 <one-line reason>
@@ -25,8 +25,24 @@ For each shorthand line, expand into:
    - <Action 1>
    - <Action 2>
    - …
-Ensure that any lab abnormalities mentioned under 'Labs' are reflected under the appropriate problem headings in both the rationale line and plan bullets.
-"""
+
+**Diagnostic & Therapeutic Workup Triggers**  
+- If a problem mentions "AKI workup": order Renal ultrasound, urine electrolytes (Na, Cl, Cr), and quantify proteinuria.
+- If a problem mentions "proteinuria workup": order ANA, ANCA, SPEP, free light chain ratio, and PLA2R.
+- If a problem mentions "screen for monoclonal gammopathy": order SPEP and free light chain ratio.
+- If a problem mentions "evaluate for infection-related GN": order C3, C4, quantify proteinuria, and AIN workup including urine eosinophils.
+- If a problem mentions "post renal AKI": order bladder scan.
+- If a problem mentions "anemia of chronic disease workup": check iron profile including iron saturation, ferritin, and transferrin saturation.
+- If a problem mentions "hypercalcemia workup": check PTH, vitamin D, calcitriol, SPEP, free light chain ratio, PTHrP, and ACE level.
+- If a problem mentions "bone mineral disease": check phosphorus and PTH if provided.
+
+**Therapeutic Triggers**  
+- If the plan includes "start isotonic bicarbonate fluid": specify D5W + 150 mEq sodium bicarbonate.
+- If the plan includes "low chloride fluid": specify Lactated Ringer's.
+- If the plan includes "Lokelma": add dose of 10 g daily.
+- If the plan includes "start Bumex": specify 2 mg IV twice daily.
+
+Ensure that triggered orders or formulations are included under the appropriate problem heading as bullet points. Always follow the exact headings and bullet structure."""
 
 # Initialize session state
 if 'current_note' not in st.session_state:
@@ -42,11 +58,18 @@ hpi = st.text_area("HPI (2–3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, calcium):", height=80)
 ap_shorthand = st.text_area(
     "Assessment & Plan (shorthand):",
-    "AKI: Hemodynamic injury, contrast exposure on admission 4/22\n"
-    "Hypercalcemia: Total Ca ~13, one pamidronate dose\n"
-    "Metastatic disease: Unknown primary, liver/spleen lesions\n"
-    "Hypovolemia\n"
-    "Metabolic acidosis: Due to AKI"
+    "AKI workup\n"
+    "Hypercalcemia workup\n"
+    "Proteinuria workup\n"
+    "Screen for monoclonal gammopathy\n"
+    "Infection-related GN workup\n"
+    "Post renal AKI\n"
+    "Anemia of chronic disease workup\n"
+    "Bone mineral disease\n"
+    "Start isotonic bicarbonate fluid\n"
+    "Low chloride fluid\n"
+    "Lokelma\n"
+    "Start Bumex\n"
 )
 
 if st.button("Generate Consultation Note"):
