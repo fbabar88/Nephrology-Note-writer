@@ -9,22 +9,23 @@ import datetime
 # Configure OpenAI API
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# System prompt for consultation note formatting and expansion
+# System prompt for note formatting and lab integration
 SYSTEM_PROMPT = """
-You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below:
+You are a board-certified nephrology AI assistant. Always format notes exactly as below:
 
 **Reason for Consultation**  
 <one-line reason>
 
 **HPI**  
-2–3 concise sentences summarizing age, timeline, key events, and labs.
+2–3 concise sentences summarizing age, timeline, key events, and labs. Incorporate all lab values provided in the 'Labs' section into the narrative.
 
 **Assessment & Plan**  
 For each shorthand line, expand into:
-1. **<Problem Name>**: One-line explanation with data.
+1. **<Problem Name>**: One-line explanation with supporting data (include relevant lab values).
    - <Action 1>
    - <Action 2>
    - …
+Ensure that any lab abnormalities mentioned under 'Labs' are reflected under the appropriate problem headings in both the rationale line and plan bullets.
 """
 
 # Initialize session state
@@ -35,6 +36,7 @@ st.title("AI Note Writer for Nephrology Consultations")
 
 # Section 1: Generate Consultation Note
 st.header("1. Generate Consultation Note")
+
 reason = st.text_input("Reason for Consultation:")
 hpi = st.text_area("HPI (2–3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, calcium):", height=80)
@@ -72,3 +74,4 @@ if st.session_state.current_note:
     st.markdown(st.session_state.current_note)
 
 # (Optional) Dataset collection and additional sections can follow unchanged.
+
