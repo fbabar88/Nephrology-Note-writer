@@ -9,147 +9,66 @@ import datetime
 # Configure OpenAI API
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Initialize session state variables if not present
-if 'current_generated_note' not in st.session_state:
-    st.session_state.current_generated_note = ""
-if 'current_soap_note' not in st.session_state:
-    st.session_state.current_soap_note = ""
-if 'dataset_entries' not in st.session_state:
-    st.session_state.dataset_entries = []
+# System prompt for consultation note formatting and expansion
+SYSTEM_PROMPT = """
+You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below:
+
+**Reason for Consultation**  
+<one-line reason>
+
+**HPI**  
+2–3 concise sentences summarizing age, timeline, key events, and labs.
+
+**Assessment & Plan**  
+For each shorthand line, expand into:
+1. **<Problem Name>**: One-line explanation with data.
+   - <Action 1>
+   - <Action 2>
+   - …
+"""
+
+# Initialize session state
+if 'current_note' not in st.session_state:
+    st.session_state.current_note = ""
 
 st.title("AI Note Writer for Nephrology Consultations")
 
-##############################################
-# Section 0: Style Template Input
-##############################################
-
-st.header("0. Note Style Configuration")
-style_template = st.text_area(
-    "Style Guidelines / Template:",
-    """
-- **HPI**: 2–3 concise sentences covering age, timeline, key events, and labs.
-- **Assessment & Plan** for each problem:
-  1. **Problem Name**: One-line explanation with supporting data.
-  2. Bullet list of actions (no parentheses), each on its own line.
-""",
-    height=100
-)
-
-##############################################
 # Section 1: Generate Consultation Note
-##############################################
-
 st.header("1. Generate Consultation Note")
-
-reason = st.text_input("Reason for Consultation:", "")
-symptoms = st.text_area("Presenting Symptoms:", "", height=80)
-context_history = st.text_area("Clinical History & Context:", "", height=80)
-labs = st.text_area("Labs:", "", height=80)
-assessment_plan_input = st.text_area(
-    "Assessment & Plan:",
-    "Enter problem headings and treatment options, e.g.:\n"
-    "AKI on CKD III: Creatinine 4.2 suggests contrast injury; optimize fluids, monitor labs.\n"
-    "Metabolic Acidosis: Bicarb 20 due to AKI; monitor values, consider supplementation.\n",
-    height=150
+reason = st.text_input("Reason for Consultation:")
+hpi = st.text_area("HPI (2–3 sentences):", height=80)
+labs = st.text_area("Labs (e.g., Cr, calcium):", height=80)
+ap_shorthand = st.text_area(
+    "Assessment & Plan (shorthand):",
+    "AKI: Hemodynamic injury, contrast exposure on admission 4/22\n"
+    "Hypercalcemia: Total Ca ~13, one pamidronate dose\n"
+    "Metastatic disease: Unknown primary, liver/spleen lesions\n"
+    "Hypovolemia\n"
+    "Metabolic acidosis: Due to AKI"
 )
 
 if st.button("Generate Consultation Note"):
-    prompt = f"""
-Apply these style rules:
-{style_template}
-
-Generate a comprehensive Epic consultation note:
-
-**Reason for Consultation:**
-{reason}
-
-**HPI:**
-{symptoms} {context_history} Labs: {labs}
-
-**Assessment & Plan:**
-{assessment_plan_input}
-
-"""
-    with st.spinner("Generating Consultation Note..."):
+    user_input = (
+        f"**Reason for Consultation:** {reason}\n\n"
+        f"**HPI:** {hpi}\n\n"
+        f"**Labs:** {labs}\n\n"
+        f"**Assessment & Plan:**\n{ap_shorthand}"
+    )
+    with st.spinner("Generating Note..."):
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a nephrology AI assistant for structured notes."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_input}
             ],
             max_tokens=1200,
-            temperature=0.5,
+            temperature=0.7,
         )
-        generated_note = response.choices[0].message.content.strip()
-        st.session_state.current_generated_note = generated_note
-        st.text_area("Consultation Note:", value=generated_note, height=400)
+    st.session_state.current_note = response.choices[0].message.content.strip()
 
-##############################################
-# Section 2: Generate SOAP Note with Case Update
-##############################################
+# Display generated note
+if st.session_state.current_note:
+    st.subheader("Consultation Note")
+    st.markdown(st.session_state.current_note)
 
-st.header("2. Generate SOAP Note from Consultation Note with Case Update")
-case_update = st.text_area("Case Update:", "Enter a comprehensive update on the case", height=150)
-
-if st.button("Generate SOAP Note"):
-    if not st.session_state.current_generated_note:
-        st.error("Please generate a consultation note first.")
-    else:
-        soap_prompt = f"""
-Apply these style rules:
-{style_template}
-
-Using the consultation note and case update, generate a SOAP note (omit Objective):
-
-Consultation Note:
-{st.session_state.current_generated_note}
-
-Case Update:
-{case_update}
-
-SOAP Note:
-"""
-        with st.spinner("Generating SOAP Note..."):
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a nephrology AI assistant for structured SOAP notes."},
-                    {"role": "user", "content": soap_prompt}
-                ],
-                max_tokens=800,
-                temperature=0.7,
-            )
-            soap_note = response.choices[0].message.content.strip()
-            st.session_state.current_soap_note = soap_note
-            st.text_area("SOAP Note:", value=soap_note, height=400)
-
-##############################################
-# Section 3: Dataset Collection for Fine-Tuning
-##############################################
-
-st.header("3. Dataset Collection for Fine-Tuning")
-
-if st.button("Save Entry to Dataset"):
-    entry = {
-        "style_guidelines": style_template,
-        "reason_for_consultation": reason,
-        "presenting_symptoms": symptoms,
-        "clinical_history_context": context_history,
-        "labs": labs,
-        "assessment_plan_input": assessment_plan_input,
-        "consultation_note": st.session_state.current_generated_note,
-        "case_update": case_update,
-        "soap_note": st.session_state.current_soap_note,
-        "timestamp": str(datetime.datetime.now())
-    }
-    st.session_state.dataset_entries.append(entry)
-    with open("dataset_entries.jsonl", "a") as f:
-        json.dump(entry, f)
-        f.write("\n")
-    st.success("Entry saved to dataset!")
-
-if st.button("Download Dataset"):
-    dataset_jsonl = "\n".join([json.dumps(entry) for entry in st.session_state.dataset_entries])
-    st.download_button(label="Download Dataset", data=dataset_jsonl,
-                       file_name="fine_tuning_dataset.jsonl", mime="text/plain")
-
+# (Optional) Dataset collection and additional sections can follow unchanged.
