@@ -30,27 +30,27 @@ For each shorthand line, expand into:
 - Always include **Reason for Consultation** and **HPI** sections at the top.
 - Do not start plan bullets with “The patient”; begin with the action verb or order.
 
-**Diagnostic & Therapeutic Workup Triggers**  
-- If a problem mentions "AKI workup": order Renal ultrasound, urine electrolytes (Na, Cl, Cr), and quantify proteinuria.
-- If a problem mentions "proteinuria workup": order ANA, ANCA, SPEP, free light chain ratio, and PLA2R.
-- If a problem mentions "screen for monoclonal gammopathy": order SPEP and free light chain ratio.
-- If a problem mentions "evaluate for infection-related GN": order C3, C4, quantify proteinuria, and AIN workup including urine eosinophils.
-- If a problem mentions "post renal AKI": order bladder scan.
-- If a problem mentions "anemia of chronic disease workup": check iron profile including iron saturation, ferritin, and transferrin saturation.
-- If a problem mentions "hypercalcemia workup": check PTH, vitamin D, calcitriol, SPEP, free light chain ratio, PTHrP, and ACE level.
-- If a problem mentions "bone mineral disease": check phosphorus and PTH if provided.
-- If a problem mentions "hyponatremia workup": order urine sodium, urine osmolality, TSH, cortisol (skip if already ordered).
+**Diagnostic Workup Triggers**  
+- AKI workup: Renal ultrasound, urine electrolytes (Na, Cl, Cr), quantify proteinuria.
+- AIN workup: Urine eosinophils.
+- Proteinuria workup: ANA, ANCA, SPEP, free light chain ratio, PLA2R.
+- Screen for monoclonal gammopathy: SPEP, free light chain ratio.
+- Evaluate for infection-related GN: C3, C4, quantify proteinuria, AIN workup (urine eosinophils).
+- Post renal AKI: Bladder scan.
+- Anemia of chronic disease workup: Iron saturation, ferritin, transferrin saturation.
+- Hypercalcemia workup: PTH, vitamin D, calcitriol, SPEP, free light chain ratio, PTHrP, ACE level.
+- Bone mineral disease: Phosphorus, PTH.
+- Hyponatremia workup: Urine sodium, urine osmolality, TSH, cortisol (skip if already ordered).
 
 **Therapeutic Triggers**  
-- If the plan includes "start isotonic bicarbonate fluid": specify D5W + 150 mEq sodium bicarbonate.
-- If the plan includes "low chloride fluid": specify Lactated Ringer's.
-- If the plan includes "Lokelma": add dose of 10 g daily.
-- If the plan includes "start Bumex": specify 2 mg IV twice daily.
-- If the plan includes "hyponatremia": add target sodium correction of 6–8 mEq/L; include D5W +/- DDAVP if correction is rapid; include serial sodium monitoring.
-- If the plan includes "samsca protocol": prescribe tolvaptan 7.5 mg daily; include serial sodium monitoring; liberalize water intake for 24 hours; monitor neurological status closely.
+- Start isotonic bicarbonate fluid: D5W + 150 mEq sodium bicarbonate.
+- Low chloride fluid: Lactated Ringer's.
+- Lokelma: 10 g daily.
+- Start Bumex: 2 mg IV twice daily.
+- Hyponatremia: Target sodium correction 6–8 mEq/L, include D5W +/- DDAVP if rapid correction, serial sodium monitoring.
+- Samsca protocol: Tolvaptan 7.5 mg daily, serial sodium monitoring, liberalize water intake for 24 hours, monitor neurological status closely.
 
-Ensure that triggered orders or formulations are included under the appropriate problem heading as bullet points. Always follow the exact headings and bullet structure.
-"""
+Ensure triggered items appear in a single line under the appropriate problem heading, following the exact headings and bullet structure."""
 
 # Initialize session state
 if 'current_note' not in st.session_state:
