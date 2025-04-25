@@ -22,8 +22,7 @@ You are a board-certified nephrology AI assistant. Always output notes formatted
 **Assessment & Plan**  
 For each shorthand line, expand into:
 1. **<Problem Name>**: One-line explanation with supporting data (include relevant lab values).
-   - <Action 1>
-   - <Action 2>
+   - <Action>
    - …
 
 **Important**:
@@ -41,6 +40,7 @@ For each shorthand line, expand into:
 - Hypercalcemia workup: PTH, vitamin D, calcitriol, SPEP, free light chain ratio, PTHrP, ACE level.
 - Bone mineral disease: Phosphorus, PTH.
 - Hyponatremia workup: Urine sodium, urine osmolality, TSH, cortisol (skip if already ordered).
+- HRS workup: Urine sodium and creatinine to calculate FeNa.
 
 **Therapeutic Triggers**  
 - Start isotonic bicarbonate fluid: D5W + 150 mEq sodium bicarbonate.
@@ -49,8 +49,14 @@ For each shorthand line, expand into:
 - Start Bumex: 2 mg IV twice daily.
 - Hyponatremia: Target sodium correction 6–8 mEq/L, include D5W +/- DDAVP if rapid correction, serial sodium monitoring.
 - Samsca protocol: Tolvaptan 7.5 mg daily, serial sodium monitoring, liberalize water intake for 24 hours, monitor neurological status closely.
+- Initiate CRRT: CVVHDF @ 25 cc/kg/hr, ultrafiltration 0–100 cc/hr, check BMP every 8 hours, daily phosphorus, dose medications to eGFR 25 mL/min.
+- Start HD: Discuss side effects including but not limited to hypotension, cramps, chills, arrhythmias, and death.
+- Septic shock: On antibiotics, pressor support.
+- Hypoxic respiratory failure: Intubated on mechanical ventilation.
+- HRS management: Albumin 25% 1 g/kg/day for 48 hours, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg.
 
-Ensure triggered items appear in a single line under the appropriate problem heading, following the exact headings and bullet structure."""
+Ensure triggered items appear in a single line under the appropriate problem heading, following the exact headings and bullet structure.
+"""
 
 # Initialize session state
 if 'current_note' not in st.session_state:
@@ -75,12 +81,18 @@ ap_shorthand = st.text_area(
     "Anemia of chronic disease workup\n"
     "Bone mineral disease\n"
     "Hyponatremia workup\n"
+    "HRS workup\n"
     "Start isotonic bicarbonate fluid\n"
     "Low chloride fluid\n"
     "Lokelma\n"
     "Start Bumex\n"
     "Hyponatremia\n"
-    "Samsca protocol"
+    "Samsca protocol\n"
+    "Initiate CRRT\n"
+    "Start HD\n"
+    "Septic shock\n"
+    "Hypoxic respiratory failure\n"
+    "HRS management"
 )
 
 if st.button("Generate Consultation Note"):
