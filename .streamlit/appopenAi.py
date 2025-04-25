@@ -20,6 +20,22 @@ if 'dataset_entries' not in st.session_state:
 st.title("AI Note Writer for Nephrology Consultations")
 
 ##############################################
+# Section 0: Style Template Input
+##############################################
+
+st.header("0. Note Style Configuration")
+style_template = st.text_area(
+    "Style Guidelines / Template:",
+    """
+- **HPI**: 2–3 concise sentences covering age, timeline, key events, and labs.
+- **Assessment & Plan** for each problem:
+  1. **Problem Name**: One-line explanation with supporting data.
+  2. Bullet list of actions (no parentheses), each on its own line.
+""",
+    height=100
+)
+
+##############################################
 # Section 1: Generate Consultation Note
 ##############################################
 
@@ -31,55 +47,45 @@ context_history = st.text_area("Clinical History & Context:", "", height=80)
 labs = st.text_area("Labs:", "", height=80)
 assessment_plan_input = st.text_area(
     "Assessment & Plan:",
-    "Enter a combined list of problem headings and corresponding treatment options.\n"
-    "For example:\n"
-    "AKI: Optimize fluid management, avoid nephrotoxic agents, consider RRT if indicated.\n"
-    "Metabolic Acidosis: Monitor acid-base status, administer bicarbonate if pH < 7.2.\n"
-    "Cardiogenic Shock: Adjust pressor support and collaborate with cardiology.",
+    "Enter problem headings and treatment options, e.g.:\n"
+    "AKI on CKD III: Creatinine 4.2 suggests contrast injury; optimize fluids, monitor labs.\n"
+    "Metabolic Acidosis: Bicarb 20 due to AKI; monitor values, consider supplementation.\n",
     height=150
 )
 
 if st.button("Generate Consultation Note"):
     prompt = f"""
-Generate a comprehensive Epic consultation note in the style of a board-certified nephrologist using the following inputs:
+Apply these style rules:
+{style_template}
+
+Generate a comprehensive Epic consultation note:
 
 **Reason for Consultation:**
 {reason}
 
-**Presenting Symptoms:**
-{symptoms}
+**HPI:**
+{symptoms} {context_history} Labs: {labs}
 
-**Clinical History & Context:**
-{context_history}
-
-**Labs:**
-{labs}
-
-**Assessment & Plan (Targeted):**
+**Assessment & Plan:**
 {assessment_plan_input}
 
-Based on the above, generate a note that includes:
-1. **Reason for Consultation:** Restate the consultation reason.
-2. **History of Present Illness (HPI):** Provide a concise narrative summarizing the presenting symptoms, clinical history & context, and labs.
-3. **Assessment and Plan:** For each problem mentioned in the 'Assessment & Plan' input, elaborate a brief assessment using clinical details from the HPI and then integrate the corresponding targeted treatment options.
-Do not add any extra summary sections.
 """
     with st.spinner("Generating Consultation Note..."):
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a board-certified nephrologist AI assistant specialized in generating Epic consultation notes."},
+                {"role": "system", "content": "You are a nephrology AI assistant for structured notes."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=1200,
-            temperature=0.7,
+            temperature=0.5,
         )
         generated_note = response.choices[0].message.content.strip()
         st.session_state.current_generated_note = generated_note
         st.text_area("Consultation Note:", value=generated_note, height=400)
 
 ##############################################
-# Section 2: Generate SOAP Note from Consultation Note with Case Update
+# Section 2: Generate SOAP Note with Case Update
 ##############################################
 
 st.header("2. Generate SOAP Note from Consultation Note with Case Update")
@@ -90,11 +96,10 @@ if st.button("Generate SOAP Note"):
         st.error("Please generate a consultation note first.")
     else:
         soap_prompt = f"""
-Using the following consultation note and case update, generate a SOAP note for a progress note in the style of a board-certified nephrologist.
-In the SOAP note:
-- **Subjective:** Provide a concise statement of the patient's current condition using the case update.
-- **Assessment and Plan:** Reflect the problem list and treatment options as provided in the consultation note.
-- **Objective:** Omit this section.
+Apply these style rules:
+{style_template}
+
+Using the consultation note and case update, generate a SOAP note (omit Objective):
 
 Consultation Note:
 {st.session_state.current_generated_note}
@@ -108,7 +113,7 @@ SOAP Note:
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are a board-certified nephrologist AI assistant specialized in generating SOAP notes from consultation notes and updates."},
+                    {"role": "system", "content": "You are a nephrology AI assistant for structured SOAP notes."},
                     {"role": "user", "content": soap_prompt}
                 ],
                 max_tokens=800,
@@ -126,6 +131,7 @@ st.header("3. Dataset Collection for Fine-Tuning")
 
 if st.button("Save Entry to Dataset"):
     entry = {
+        "style_guidelines": style_template,
         "reason_for_consultation": reason,
         "presenting_symptoms": symptoms,
         "clinical_history_context": context_history,
@@ -137,14 +143,13 @@ if st.button("Save Entry to Dataset"):
         "timestamp": str(datetime.datetime.now())
     }
     st.session_state.dataset_entries.append(entry)
-    # Append the entry to a file for persistence
     with open("dataset_entries.jsonl", "a") as f:
         json.dump(entry, f)
         f.write("\n")
     st.success("Entry saved to dataset!")
 
 if st.button("Download Dataset"):
-    # Combine dataset entries into JSONL format for download
     dataset_jsonl = "\n".join([json.dumps(entry) for entry in st.session_state.dataset_entries])
     st.download_button(label="Download Dataset", data=dataset_jsonl,
                        file_name="fine_tuning_dataset.jsonl", mime="text/plain")
+
