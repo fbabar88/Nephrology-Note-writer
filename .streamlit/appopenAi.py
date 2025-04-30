@@ -9,8 +9,41 @@ import datetime
 # Configure OpenAI API
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# System prompt for note formatting, lab integration, diagnostic & therapeutic triggers
-SYSTEM_PROMPT = """
+# Define your trigger descriptions
+TRIGGERS = {
+    "AKI workup": "Renal ultrasound, urine electrolytes (Na, Cl, Cr), quantify proteinuria",
+    "AIN workup": "Urine eosinophils",
+    "Proteinuria workup": "ANA, ANCA, SPEP, free light chain ratio, PLA2R",
+    "Screen for monoclonal gammopathy": "SPEP, free light chain ratio",
+    "Evaluate for infection-related GN": "C3, C4, quantify proteinuria, AIN workup (urine eosinophils)",
+    "Post renal AKI": "Bladder scan",
+    "Anemia of chronic disease workup": "Iron saturation, ferritin, transferrin saturation",
+    "Hypercalcemia workup": "PTH, vitamin D, calcitriol, SPEP, free light chain ratio, PTHrP, ACE level",
+    "Bone mineral disease": "Phosphorus, PTH",
+    "Hyponatremia workup": "Urine sodium, urine osmolality, TSH, cortisol (skip if already ordered)",
+    "HRS workup": "Urine sodium and creatinine to calculate FeNa",
+    "Start isotonic bicarbonate fluid": "D5W + 150 mEq sodium bicarbonate",
+    "Low chloride fluid": "Lactated Ringer's",
+    "Lokelma": "10 g daily",
+    "Start Bumex": "2 mg IV twice daily",
+    "Hyponatremia": "Target sodium correction 6–8 mEq/L, D5W ± DDAVP if rapid correction, serial sodium monitoring",
+    "Samsca protocol": "Tolvaptan 7.5 mg daily, serial sodium monitoring, liberalize water intake, monitor neurological status",
+    "Initiate CRRT": "CVVHDF @ 25 cc/kg/hr, UF 0–100 cc/hr, BMP q8h, daily phosphorus, dose meds to eGFR 25 mL/min",
+    "Start HD": "Discuss side effects: hypotension, cramps, chills, arrhythmias, death",
+    "Septic shock": "On antibiotics, pressor support",
+    "Hypoxic respiratory failure": "Intubated on mechanical ventilation",
+    "HRS management": "Albumin 25% 1 g/kg/day ×48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg"
+}
+
+# System prompt for trigger extraction
+EXTRACTOR_SYSTEM = f"""
+You are a trigger-extraction assistant. Given a free-form user request, return a JSON list of exact trigger names chosen from this master list:
+{json.dumps(list(TRIGGERS.keys()))}
+Only output the JSON array.
+"""
+
+# System prompt for note formatting and expansion
+GENERATOR_SYSTEM = """
 You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below, in this order:
 
 **Reason for Consultation**  
@@ -20,103 +53,59 @@ You are a board-certified nephrology AI assistant. Always output notes formatted
 2–3 concise sentences summarizing age, timeline, key events, and labs (include all labs provided).
 
 **Assessment & Plan**  
-For each shorthand line, expand into:
+For each trigger line, expand into:
 1. **<Problem Name>**: One-line explanation with supporting data (include relevant lab values).
-   - <Action>
-   - …
+   - <Action bullet or single-line order, per trigger definition>
 
-**Important**:
-- Always include **Reason for Consultation** and **HPI** sections at the top.
-- Do not start plan bullets with “The patient”; begin with the action verb or order.
-
-**Diagnostic Workup Triggers**  
-- AKI workup: Renal ultrasound, urine electrolytes (Na, Cl, Cr), quantify proteinuria.
-- AIN workup: Urine eosinophils.
-- Proteinuria workup: ANA, ANCA, SPEP, free light chain ratio, PLA2R.
-- Screen for monoclonal gammopathy: SPEP, free light chain ratio.
-- Evaluate for infection-related GN: C3, C4, quantify proteinuria, AIN workup (urine eosinophils).
-- Post renal AKI: Bladder scan.
-- Anemia of chronic disease workup: Iron saturation, ferritin, transferrin saturation.
-- Hypercalcemia workup: PTH, vitamin D, calcitriol, SPEP, free light chain ratio, PTHrP, ACE level.
-- Bone mineral disease: Phosphorus, PTH.
-- Hyponatremia workup: Urine sodium, urine osmolality, TSH, cortisol (skip if already ordered).
-- HRS workup: Urine sodium and creatinine to calculate FeNa.
-
-**Therapeutic Triggers**  
-- Start isotonic bicarbonate fluid: D5W + 150 mEq sodium bicarbonate.
-- Low chloride fluid: Lactated Ringer's.
-- Lokelma: 10 g daily.
-- Start Bumex: 2 mg IV twice daily.
-- Hyponatremia: Target sodium correction 6–8 mEq/L, include D5W +/- DDAVP if rapid correction, serial sodium monitoring.
-- Samsca protocol: Tolvaptan 7.5 mg daily, serial sodium monitoring, liberalize water intake for 24 hours, monitor neurological status closely.
-- Initiate CRRT: CVVHDF @ 25 cc/kg/hr, ultrafiltration 0–100 cc/hr, check BMP every 8 hours, daily phosphorus, dose medications to eGFR 25 mL/min.
-- Start HD: Discuss side effects including but not limited to hypotension, cramps, chills, arrhythmias, and death.
-- Septic shock: On antibiotics, pressor support.
-- Hypoxic respiratory failure: Intubated on mechanical ventilation.
-- HRS management: Albumin 25% 1 g/kg/day for 48 hours, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg.
-
-Ensure triggered items appear in a single line under the appropriate problem heading, following the exact headings and bullet structure.
+Include each trigger’s diagnostic or therapeutic instructions exactly as defined.
 """
 
-# Initialize session state
-if 'current_note' not in st.session_state:
-    st.session_state.current_note = ""
-
+# Title
 st.title("AI Note Writer for Nephrology Consultations")
 
-# Section 1: Generate Consultation Note
-st.header("1. Generate Consultation Note")
-
+# Inputs
 reason = st.text_input("Reason for Consultation:")
 hpi = st.text_area("HPI (2–3 sentences):", height=80)
-labs = st.text_area("Labs (e.g., Cr, sodium, calcium):", height=80)
-ap_shorthand = st.text_area(
-    "Assessment & Plan (shorthand):",
-    "AKI workup\n"
-    "Hypercalcemia workup\n"
-    "Proteinuria workup\n"
-    "Screen for monoclonal gammopathy\n"
-    "Evaluate for infection-related GN workup\n"
-    "Post renal AKI\n"
-    "Anemia of chronic disease workup\n"
-    "Bone mineral disease\n"
-    "Hyponatremia workup\n"
-    "HRS workup\n"
-    "Start isotonic bicarbonate fluid\n"
-    "Low chloride fluid\n"
-    "Lokelma\n"
-    "Start Bumex\n"
-    "Hyponatremia\n"
-    "Samsca protocol\n"
-    "Initiate CRRT\n"
-    "Start HD\n"
-    "Septic shock\n"
-    "Hypoxic respiratory failure\n"
-    "HRS management"
-)
+labs = st.text_area("Labs (e.g., Cr, Na, Ca):", height=80)
+free_text = st.text_area("Assessment & Plan (free text):", height=100,
+                         help="E.g., 'Please include AKI workup, start Bumex, hyponatremia workup'")
 
+# Generate button
 if st.button("Generate Consultation Note"):
-    user_input = (
+    with st.spinner("Extracting triggers..."):
+        resp1 = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": EXTRACTOR_SYSTEM},
+                {"role": "user",   "content": free_text}
+            ],
+            temperature=0
+        )
+    selected = json.loads(resp1.choices[0].message.content)
+
+    # Map to shorthand lines
+    ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in selected)
+
+    # Build full user prompt for generation
+    user_content = (
         f"**Reason for Consultation:** {reason}\n\n"
         f"**HPI:** {hpi}\n\n"
         f"**Labs:** {labs}\n\n"
         f"**Assessment & Plan:**\n{ap_shorthand}"
     )
-    with st.spinner("Generating Note..."):
-        response = openai.ChatCompletion.create(
+
+    with st.spinner("Generating note..."):
+        resp2 = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_input}
+                {"role": "system",  "content": GENERATOR_SYSTEM},
+                {"role": "user",    "content": user_content}
             ],
             max_tokens=1200,
-            temperature=0.7,
+            temperature=0.7
         )
-    st.session_state.current_note = response.choices[0].message.content.strip()
-
-# Display generated note
-if st.session_state.current_note:
+    note = resp2.choices[0].message.content.strip()
     st.subheader("Consultation Note")
-    st.markdown(st.session_state.current_note)
+    st.markdown(note)
 
-# (Optional) Dataset collection and additional sections can follow unchanged.
+# (Optional) Dataset saving or download buttons can follow
