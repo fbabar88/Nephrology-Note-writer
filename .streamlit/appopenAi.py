@@ -1,3 +1,7 @@
+import streamlit as st
+import openai
+import json
+
 # Secure your API key in .streamlit/secrets.toml:
 # OPENAI_API_KEY = "your_api_key_here"
 
