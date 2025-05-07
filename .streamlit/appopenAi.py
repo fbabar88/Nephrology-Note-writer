@@ -8,36 +8,37 @@ import json
 # Configure OpenAI API
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Define canonical triggers with descriptions
+# Define canonical triggers with descriptions (static names only)
 TRIGGERS = {
-    "AKI on CKD": "Scan for precipitants; renal ultrasound, urinalysis, quantify proteinuria, urine electrolytes (Na, Cl, Cr), urine eosinophils; optimize volume, hold ACEI/ARB, adjust diuretics, monitor output and creatinine",
-    "AKI workup": "Renal ultrasound, urinalysis, quantify proteinuria, urine electrolytes (Na, Cl, Cr), urine eosinophils",
-    "AKI management": "Optimize volume status with isotonic fluids, hold ACEI/ARB, adjust diuretics, monitor urine output and creatinine",
-    "Proteinuria workup": "Order ANA, ANCA, PLA2R, SPEP, free light chain ratio",
-    "Hypercalcemia workup": "Order SPEP, PTH, PTHrP, free light chain ratio, ACE level, vitamin D (calcitriol) level, CXR",
-    "Hypercalcemia management": "Administer IV fluids; Pamidronate 90 mg IV once; Calcitriol 4 IU/kg every 12h",
-    "Hyperkalemia management": "Administer IV calcium gluconate 2 g; regular insulin 10 U IV with D50 1 amp; Na-bicarbonate 50 mEq IV once; start Lokelma 10 g TID",
-    "Acid-base disturbance": "Perform ABG, calculate anion gap, check lactate and electrolytes, assess RTA",
-    "Hyponatremia workup": "Urine sodium, urine osmolality, uric acid, serum osmolality, cortisol, TSH",
-    "Hyponatremia management": "Serial sodium monitoring; target sodium correction 6-8 mEq/L in 24 hours",
-    "CRRT initiation": "CVVHDF @25 cc/kg/hr; UF 0-100 cc/hr as tolerated; serial BMP q8h; daily phosphorus; dose meds to eGFR 25-30 mL/min; discuss risks/benefits with family",
-    "ESRD management": "Dialysis schedule MWF or TTS; access type (tunneled catheter vs AV fistula); outpatient HD unit",
-    "Peritoneal dialysis prescription": "Home PD prescription: number of exchanges, fill volume, dwell time, bag type as per patient's regimen",
-    "Dialysis modality discussion": "Discuss in-center vs home vs conservative dialysis; address patient concerns and questions during this visit",
-    "Anemia management": "Check iron panel if not provided; administer ESA weekly (CKD) or on HD days (ESRD); transfuse if hemoglobin <7 g/dL",
-    "Bone mineral disorder management": "Order serum phosphorus and PTH if missing; start phosphate binders; consider vitamin D analog therapy",
-    "CRS management": "Scan echocardiogram for EF and diastolic dysfunction; review diuretic dosing and weight trends; optimize diuretics and fluid management; note inability to initiate ACEi/ARB/ARNI/MRA/SGLT-2 inhibitors if AKI present",
-    "Hemodialysis initiation": "Initiate intermittent HD for acute indications (oliguria, refractory hyperkalemia, severe metabolic acidosis, refractory volume overload, uremia); discuss risks/complications; define prescription and coordinate with HD unit"
+    "AKI": "",
+    "AKI on CKD": "",
+    "AKI workup": "",
+    "AKI management": "",
+    "Proteinuria workup": "",
+    "Hypercalcemia workup": "",
+    "Hypercalcemia management": "",
+    "Hyperkalemia management": "",
+    "Acid-base disturbance": "",
+    "Hyponatremia workup": "",
+    "Hyponatremia management": "",
+    "CRRT initiation": "",
+    "ESRD management": "",
+    "Peritoneal dialysis prescription": "",
+    "Dialysis modality discussion": "",
+    "Anemia management": "",
+    "Bone mineral disorder management": "",
+    "CRS management": "",
+    "Hemodialysis initiation": ""
 }
 
-# System prompt for trigger extraction
+# Extractor: only lists trigger names
 EXTRACTOR_SYSTEM = f"""
 You are a trigger-extraction assistant. Given a free-form user request, return a JSON array of exact trigger names chosen from this list:
 {json.dumps(list(TRIGGERS.keys()))}
 Only output the JSON array.
 """
 
-# System prompt for note formatting and expansion
+# Generator: dynamic playbook for each trigger
 GENERATOR_SYSTEM = """
 You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below, in this order:
 
@@ -48,9 +49,75 @@ You are a board-certified nephrology AI assistant. Always output notes formatted
 2–3 concise sentences summarizing age, timeline, key events, and labs (include all labs provided).
 
 **Assessment & Plan**  
-For each trigger:
-1. **<Problem Name>**: One-line explanation with supporting data.
-   - <Action bullet or single-line order>
+For each trigger in the provided list, apply the following dynamic logic:
+
+- **AKI**:
+  • **Rationale**: Identify rise in creatinine from baseline; scan HPI and Labs for precipitants: volume overload (edema, weight gain), hypovolemia (vomiting/diarrhea), contrast exposure (dates), nephrotoxins (diuretics, ACEi/ARB, SGLT‑2i), obstruction (urinary retention, hydronephrosis). Weave these into one sentence.
+  • **Workup**: Order renal ultrasound, UA, urine Na/Cl/Cr, quantify proteinuria, urine eosinophils unless already documented.
+  • **Management**: Tailor to data: if hypovolemic → isotonic fluids; if overloaded → diuresis; always hold ACEi/ARB in AKI; monitor urine output and creatinine q8h.
+
+- **AKI on CKD**:
+  • **Rationale**: Similar to AKI, but phrase as "AKI on CKD" specifying baseline CKD stage and added precipitants.
+  • **Plan**: As AKI, plus CKD-specific monitoring of GFR and nephrotoxin avoidance.
+
+- **AKI workup** and **AKI management**: Apply the same workup/management sub‑sections as above when triggered individually.
+
+- **Proteinuria workup**:
+  • **Rationale**: Check for diabetes history (diabetes, HbA1c), autoimmune (SLE, vasculitis) and monoclonal (SPEP, free light chains).
+  • **Plan**: Order ANA, ANCA, PLA2R, SPEP, free light chain ratio.
+
+- **Hypercalcemia workup**:
+  • **Rationale**: Note the calcium level and scan for symptoms (stones, bones, groans, psychiatric).
+  • **Plan**: Order SPEP, PTH, PTHrP, free light chains, ACE level, vitamin D levels, CXR.
+
+- **Hypercalcemia management**:
+  • **Plan**: Administer IV fluids; give pamidronate 90 mg IV once; start calcitriol 4 IU/kg q12h; monitor calcium daily.
+
+- **Hyperkalemia management**:
+  • **Rationale**: Note potassium level and any ECG changes if provided.
+  • **Plan**: Give IV calcium gluconate 2 g; insulin 10 U IV + D50; sodium bicarb 50 mEq IV; Lokelma 10 g TID; repeat K in 4h.
+
+- **Acid-base disturbance**:
+  • **Rationale**: Classify as high-AG, non-AG, lactic, or RTA; mention lab values.
+  • **Plan**: Order ABG, calculate AG, check lactate/electrolytes; if non-AG or RTA, tailor bicarbonate therapy and monitor NaHCO3 use.
+
+- **Hyponatremia workup**:
+  • **Rationale**: Confirm Na<135; scan for volume status and labs.
+  • **Plan**: Order urine Na/osmolality, serum osmolality, uric acid, cortisol, TSH.
+
+- **Hyponatremia management**:
+  • **Plan**: Serial Na monitoring; aim correction 6–8 mEq/L per 24h; consider D5W/ddavp if overcorrection risk.
+
+- **CRRT initiation**:
+  • **Rationale**: Indications (intractable fluid, electrolyte/acid‑base disorders, uremia).
+  • **Plan**: CVVHDF @25 cc/kg/hr; UF 0–100 cc/hr; BMP q8h; daily phosphorus; adjust meds to eGFR 25–30; discuss risks/benefits.
+
+- **ESRD management**:
+  • **Plan**: Confirm MWF or TTS schedule; state access (AV fistula vs tunneled catheter); organize outpatient HD.
+
+- **Peritoneal dialysis prescription**:
+  • **Plan**: Document home PD regimen: exchanges/day, fill volume, dwell time, bag type per patient’s prescription.
+
+- **Dialysis modality discussion**:
+  • **Plan**: Compare in-center vs home vs conservative; address patient concerns.
+
+- **Anemia management**:
+  • **Rationale**: Note Hb; CKD vs ESRD context.
+  • **Plan**: Check iron panel if missing; ESA weekly (CKD) or on HD days (ESRD); transfuse Hgb<7.
+
+- **Bone mineral disorder management**:
+  • **Rationale**: Note phosphorous/PTH lab values.
+  • **Plan**: Order missing labs; start phosphate binders; consider vitamin D analog.
+
+- **CRS management**:
+  • **Rationale**: Integrate echo EF/diastolic dysfunction findings; weight trends; diuretic doses.
+  • **Plan**: Use Bumex 2 mg IV BID; optimize fluid balance; note inability to start guideline meds if AKI present.
+
+- **Hemodialysis initiation**:
+  • **Rationale**: Identify acute indications: oliguria, refractory hyperkalemia/acidosis, volume overload, uremia.
+  • **Plan**: Initiate intermittent HD; define blood/dialysate flow and duration; warn about hypotension, cramps; coordinate with HD unit.
+
+Follow these rules to generate a concise, dynamic note for each triggered problem.
 """
 
 # Streamlit UI
@@ -61,11 +128,11 @@ hpi = st.text_area("HPI (2–3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, Na, K, Ca):", height=80)
 free_text = st.text_area(
     "Assessment & Plan (free text):", height=100,
-    help="E.g., 'Include AKI workup, start Bumex, hyponatremia management'"
+    help="E.g., 'Include AKI, hyperkalemia management, acid-base disturbance, CRS management'"
 )
 
 if st.button("Generate Consultation Note"):
-    # 1st: Extract triggers
+    # 1. Extract triggers
     resp1 = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
@@ -76,10 +143,10 @@ if st.button("Generate Consultation Note"):
     )
     selected = json.loads(resp1.choices[0].message.content)
 
-    # Build combined A&P
+    # 2. Build shorthand (static names only)
     ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in selected)
 
-    # 2nd: Generate note
+    # 3. Generate note with dynamic playbook
     user_content = (
         f"**Reason for Consultation:** {reason}\n\n"
         f"**HPI:** {hpi}\n\n"
