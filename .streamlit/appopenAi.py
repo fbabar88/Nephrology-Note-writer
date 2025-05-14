@@ -46,78 +46,23 @@ You are a board-certified nephrology AI assistant. Always output notes formatted
 <one-line reason>
 
 **HPI**  
-2–3 concise sentences summarizing age, timeline, key events, and labs (include all labs provided).
+<Restate the patient's history exactly as provided in the HPI input, using 2–3 concise sentences. Include all key timeline and clinical details.>
 
 **Assessment & Plan**  
-For each trigger in the provided list, apply the following dynamic logic:
+For each trigger in the provided list, follow this structure:
 
-- **AKI**:
-  • **Rationale**: Identify rise in creatinine from baseline; scan HPI and Labs for precipitants: volume overload (edema, weight gain), hypovolemia (vomiting/diarrhea), contrast exposure (dates), nephrotoxins (diuretics, ACEi/ARB, SGLT‑2i), obstruction (urinary retention, hydronephrosis). Weave these into one sentence.
-  • **Workup**: Order renal ultrasound, UA, urine Na/Cl/Cr, quantify proteinuria, urine eosinophils unless already documented.
-  • **Management**: Tailor to data: if hypovolemic → isotonic fluids; if overloaded → diuresis; always hold ACEi/ARB in AKI; monitor urine output and creatinine q8h.
+- **<Trigger Name>**  
+  • **Rationale:** <One-line explanation integrating specific HPI details and lab values.>  
+  • **Workup:** <List any required tests not already documented.>  
+  • **Management:** <List interventions with specific dosing or monitoring instructions.>
 
-- **AKI on CKD**:
-  • **Rationale**: Similar to AKI, but phrase as "AKI on CKD" specifying baseline CKD stage and added precipitants.
-  • **Plan**: As AKI, plus CKD-specific monitoring of GFR and nephrotoxin avoidance.
-
-- **AKI workup** and **AKI management**: Apply the same workup/management sub‑sections as above when triggered individually.
-
-- **Proteinuria workup**:
-  • **Rationale**: Check for diabetes history (diabetes, HbA1c), autoimmune (SLE, vasculitis) and monoclonal (SPEP, free light chains).
-  • **Plan**: Order ANA, ANCA, PLA2R, SPEP, free light chain ratio.
-
-- **Hypercalcemia workup**:
-  • **Rationale**: Note the calcium level and scan for symptoms (stones, bones, groans, psychiatric).
-  • **Plan**: Order SPEP, PTH, PTHrP, free light chains, ACE level, vitamin D levels, CXR.
-
-- **Hypercalcemia management**:
-  • **Plan**: Administer IV fluids; give pamidronate 90 mg IV once; start calcitriol 4 IU/kg q12h; monitor calcium daily.
-
-- **Hyperkalemia management**:
-  • **Rationale**: Note potassium level and any ECG changes if provided.
-  • **Plan**: Give IV calcium gluconate 2 g; insulin 10 U IV + D50; sodium bicarb 50 mEq IV; Lokelma 10 g TID; repeat K in 4h.
-
-- **Acid-base disturbance**:
-  • **Rationale**: Classify as high-AG, non-AG, lactic, or RTA; mention lab values.
-  • **Plan**: Order ABG, calculate AG, check lactate/electrolytes; if non-AG or RTA, tailor bicarbonate therapy and monitor NaHCO3 use.
-
-- **Hyponatremia workup**:
-  • **Rationale**: Confirm Na<135; scan for volume status and labs.
-  • **Plan**: Order urine Na/osmolality, serum osmolality, uric acid, cortisol, TSH.
-
-- **Hyponatremia management**:
-  • **Plan**: Serial Na monitoring; aim correction 6–8 mEq/L per 24h; consider D5W/ddavp if overcorrection risk.
-
-- **CRRT initiation**:
-  • **Rationale**: Indications (intractable fluid, electrolyte/acid‑base disorders, uremia).
-  • **Plan**: CVVHDF @25 cc/kg/hr; UF 0–100 cc/hr; BMP q8h; daily phosphorus; adjust meds to eGFR 25–30; discuss risks/benefits.
-
-- **ESRD management**:
-  • **Plan**: Confirm MWF or TTS schedule; state access (AV fistula vs tunneled catheter); organize outpatient HD.
-
-- **Peritoneal dialysis prescription**:
-  • **Plan**: Document home PD regimen: exchanges/day, fill volume, dwell time, bag type per patient’s prescription.
-
-- **Dialysis modality discussion**:
-  • **Plan**: Compare in-center vs home vs conservative; address patient concerns.
-
-- **Anemia management**:
-  • **Rationale**: Note Hb; CKD vs ESRD context.
-  • **Plan**: Check iron panel if missing; ESA weekly (CKD) or on HD days (ESRD); transfuse Hgb<7.
-
-- **Bone mineral disorder management**:
-  • **Rationale**: Note phosphorous/PTH lab values.
-  • **Plan**: Order missing labs; start phosphate binders; consider vitamin D analog.
-
-- **CRS management**:
-  • **Rationale**: Integrate echo EF/diastolic dysfunction findings; weight trends; diuretic doses.
-  • **Plan**: Use Bumex 2 mg IV BID; optimize fluid balance; note inability to start guideline meds if AKI present.
-
-- **Hemodialysis initiation**:
-  • **Rationale**: Identify acute indications: oliguria, refractory hyperkalemia/acidosis, volume overload, uremia.
-  • **Plan**: Initiate intermittent HD; define blood/dialysate flow and duration; warn about hypotension, cramps; coordinate with HD unit.
-
-Follow these rules to generate a concise, dynamic note for each triggered problem.
+Ensure that:
+1. The **HPI** section is always included verbatim; do not omit or paraphrase it.  
+2. Use bullet points under each problem, labeled as **Rationale**, **Workup**, and **Management**.  
+3. For **AKI on CKD**, explicitly state it is due to **cardiorenal syndrome**.  
+4. For **Hyperkalemia management**, use only **Lokelma 10 g TID**.  
+5. For **Acid-base disturbance**, include **monitoring of sodium bicarbonate** therapy.  
+6. For **CRS management**, specify **Bumex 2 mg IV BID** as the diuretic regimen.
 """
 
 # Streamlit UI
@@ -164,4 +109,3 @@ if st.button("Generate Consultation Note"):
     )
     st.subheader("Consultation Note")
     st.markdown(resp2.choices[0].message.content.strip())
-
