@@ -34,7 +34,32 @@ TRIGGERS = {
     "HRS management": "Albumin 25% 1 g/kg/day ×48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg"
 }
 
-# Define function schemas
+# Extraction system prompt
+EXTRACTOR_SYSTEM = f"""
+You are a trigger-extraction assistant. Given a free-form user message, return a JSON list of exact trigger names chosen from this master list:
+{json.dumps(list(TRIGGERS.keys()))}
+Only output the JSON array.
+"""
+
+# Generation system prompt
+GENERATOR_SYSTEM = """
+You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below, in this order:
+
+**Reason for Consultation**  
+<one-line reason>
+
+**HPI**  
+2–3 concise sentences summarizing age, timeline, key events, and labs.
+
+**Assessment & Plan**  
+For each trigger, expand into:
+1. **<Problem Name>**: One-line explanation with supporting data (include relevant lab values).
+   - <Action bullet or single-line order, per trigger definition>
+
+Include each trigger’s diagnostic or therapeutic instructions exactly as defined.
+"""
+
+# Define function schema for extraction only
 extract_fn = {
     "name": "extract_triggers",
     "description": "Extract nephrology triggers from free text",
@@ -50,84 +75,55 @@ extract_fn = {
     }
 }
 
-generate_fn = {
-    "name": "generate_note",
-    "description": "Generate a full nephrology consultation note",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "note": {"type": "string"}
-        },
-        "required": ["note"]
-    }
-}
-
-# System prompt for both extraction and generation
-FULL_SYSTEM = f"""
-You are a board-certified nephrology AI assistant.
-
-Step 1: Extract any of these exact triggers by calling `extract_triggers`:
-{list(TRIGGERS.keys())}
-
-Step 2: Using those triggers, generate the final note by calling `generate_note`.
-The note must be formatted EXACTLY as below:
-
-**Reason for Consultation**  
-<one-line reason>
-
-**HPI**  
-2–3 concise sentences summarizing age, timeline, key events, and labs.
-
-**Assessment & Plan**  
-For each trigger:
-1. **<Trigger Name>**: One-line explanation with supporting lab data.
-   - <order from TRIGGERS>
-"""
-
-# Streamlit UI\st.title("AI Note Writer for Nephrology Consultations")
+# Streamlit UI
+st.title("AI Note Writer for Nephrology Consultations")
 
 reason = st.text_input("Reason for Consultation:")
 hpi = st.text_area("HPI (2–3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, Na, Ca):", height=80)
 free_text = st.text_area(
-    "Assessment & Plan details (free text):", height=100,
-    help="E.g., 'Rise in Cr due to contrast nephropathy; start workup and diuresis'"
+    "Assessment & Plan (free text):", height=120,
+    help="List or describe the triggers you want, e.g. 'AKI workup, Start HD, Lokelma'"
 )
 
 if st.button("Generate Consultation Note"):
-    user_raw = (
-        f"Reason: {reason}\n"
-        f"HPI: {hpi}\n"
-        f"Labs: {labs}\n"
-        f"Notes: {free_text}"
-    )
+    # Extract triggers
     with st.spinner("Extracting triggers..."):
-        # 1) Call extract_triggers
         resp1 = openai.ChatCompletion.create(
             model="gpt-4-0613",
             messages=[
-                {"role": "system", "content": FULL_SYSTEM},
-                {"role": "user", "content": user_raw}
+                {"role": "system", "content": EXTRACTOR_SYSTEM},
+                {"role": "user", "content": free_text}
             ],
             functions=[extract_fn],
-            function_call={"name": "extract_triggers"}
+            function_call={"name": "extract_triggers"},
+            temperature=0
         )
         triggers = json.loads(resp1.choices[0].message.function_call.arguments)["triggers"]
 
+    # Prepare shorthand based on extracted triggers
+    ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in triggers)
+
+    # Build the content for generation
+    user_content = (
+        f"**Reason for Consultation:** {reason}\n\n"
+        f"**HPI:** {hpi}\n\n"
+        f"**Labs:** {labs}\n\n"
+        f"**Assessment & Plan:**\n{ap_shorthand}"
+    )
+
+    # Generate final note
     with st.spinner("Generating note..."):
-        # 2) Provide function response and call generate_note
-        messages = [
-            {"role": "system", "content": FULL_SYSTEM},
-            {"role": "user", "content": user_raw},
-            {"role": "function", "name": "extract_triggers", "content": json.dumps({"triggers": triggers})}
-        ]
         resp2 = openai.ChatCompletion.create(
             model="gpt-4-0613",
-            messages=messages,
-            functions=[generate_fn],
-            function_call={"name": "generate_note"}
+            messages=[
+                {"role": "system", "content": GENERATOR_SYSTEM},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.7,
+            max_tokens=1200
         )
-        note = json.loads(resp2.choices[0].message.function_call.arguments)["note"]
+        note = resp2.choices[0].message.content.strip()
 
     st.subheader("Consultation Note")
     st.markdown(note)
