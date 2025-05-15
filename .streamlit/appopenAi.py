@@ -101,29 +101,34 @@ if st.button("Generate Consultation Note"):
         )
         triggers = json.loads(resp1.choices[0].message.function_call.arguments)["triggers"]
 
-    # Prepare shorthand based on extracted triggers
-    ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in triggers)
+    # Filter out any unrecognized triggers
+    valid_triggers = [t for t in triggers if t in TRIGGERS]
+    if not valid_triggers:
+        st.error("No valid triggers found. Please check your Assessment & Plan input.")
+    else:
+        # Prepare shorthand based on valid triggers
+        ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in valid_triggers)
 
-    # Build the content for generation
-    user_content = (
-        f"**Reason for Consultation:** {reason}\n\n"
-        f"**HPI:** {hpi}\n\n"
-        f"**Labs:** {labs}\n\n"
-        f"**Assessment & Plan:**\n{ap_shorthand}"
-    )
-
-    # Generate final note
-    with st.spinner("Generating note..."):
-        resp2 = openai.ChatCompletion.create(
-            model="gpt-4-0613",
-            messages=[
-                {"role": "system", "content": GENERATOR_SYSTEM},
-                {"role": "user", "content": user_content}
-            ],
-            temperature=0.7,
-            max_tokens=1200
+        # Build the content for generation
+        user_content = (
+            f"**Reason for Consultation:** {reason}\n\n"
+            f"**HPI:** {hpi}\n\n"
+            f"**Labs:** {labs}\n\n"
+            f"**Assessment & Plan:**\n{ap_shorthand}"
         )
-        note = resp2.choices[0].message.content.strip()
 
-    st.subheader("Consultation Note")
-    st.markdown(note)
+        # Generate final note
+        with st.spinner("Generating note..."):
+            resp2 = openai.ChatCompletion.create(
+                model="gpt-4-0613",
+                messages=[
+                    {"role": "system", "content": GENERATOR_SYSTEM},
+                    {"role": "user", "content": user_content}
+                ],
+                temperature=0.7,
+                max_tokens=1200
+            )
+            note = resp2.choices[0].message.content.strip()
+
+        st.subheader("Consultation Note")
+        st.markdown(note)
