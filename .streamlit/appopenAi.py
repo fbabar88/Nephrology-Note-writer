@@ -5,9 +5,11 @@ import json
 # Secure your API key in .streamlit/secrets.toml:
 # OPENAI_API_KEY = "your_api_key_here"
 
-# Configure OpenAI API\openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Configure OpenAI API
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Define trigger descriptions\TRIGGERS = {
+# Define trigger descriptions
+TRIGGERS = {
     "AKI workup": "Renal ultrasound, urine electrolytes (Na, Cl, Cr), quantify proteinuria",
     "AIN workup": "Urine eosinophils",
     "Proteinuria workup": "ANA, ANCA, SPEP, free light chain ratio, PLA2R",
@@ -32,7 +34,7 @@ import json
     "HRS management": "Albumin 25% 1 g/kg/day ×48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg"
 }
 
-# Function schemas
+# Define function schemas
 extract_fn = {
     "name": "extract_triggers",
     "description": "Extract nephrology triggers from free text",
@@ -82,8 +84,7 @@ For each trigger:
    - <order from TRIGGERS>
 """
 
-# Streamlit UI
-st.title("AI Note Writer for Nephrology Consultations")
+# Streamlit UI\st.title("AI Note Writer for Nephrology Consultations")
 
 reason = st.text_input("Reason for Consultation:")
 hpi = st.text_area("HPI (2–3 sentences):", height=80)
