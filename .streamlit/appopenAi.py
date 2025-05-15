@@ -25,16 +25,17 @@ TRIGGERS = {
     "Low chloride fluid": "Lactated Ringer's",
     "Lokelma": "10 g daily",
     "Start Bumex": "2 mg IV twice daily",
-    "Hyponatremia": "Target sodium correction 6–8 mEq/L, D5W ± DDAVP if rapid correction, serial sodium monitoring",
+    "Hyponatremia": "Target sodium correction 6-8 mEq/L, D5W ± DDAVP if rapid correction, serial sodium monitoring",
     "Samsca protocol": "Tolvaptan 7.5 mg daily, serial sodium monitoring, liberalize water intake, monitor neurological status",
-    "Initiate CRRT": "CVVHDF @ 25 cc/kg/hr, UF 0–100 cc/hr, BMP q8h, daily phosphorus, dose meds to eGFR 25 mL/min",
+    "Initiate CRRT": "CVVHDF @ 25 cc/kg/hr, UF 0-100 cc/hr, BMP q8h, daily phosphorus, dose meds to eGFR 25 mL/min",
     "Start HD": "Discuss side effects: hypotension, cramps, chills, arrhythmias, death",
     "Septic shock": "On antibiotics, pressor support",
     "Hypoxic respiratory failure": "Intubated on mechanical ventilation",
-    "HRS management": "Albumin 25% 1 g/kg/day ×48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg"
+    "HRS management": "Albumin 25% 1 g/kg/day x48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP >= 110 mmHg"
 }
 
-# Extraction prompt for trigger names\ nEXTRACTOR_SYSTEM = f"""
+# Extraction prompt for trigger names
+EXTRACTOR_SYSTEM = f"""
 You are a trigger-extraction assistant. Given a free-form user message, return a JSON array of exact trigger names selected from this master list:
 {json.dumps(list(TRIGGERS.keys()))}
 Only output the JSON array.
@@ -48,10 +49,10 @@ You are a board-certified nephrology AI assistant. Compose a complete consultati
 Use the reason text provided as a single line.
 
 **HPI**
-Provide 2–3 concise sentences summarizing the patient's age, timeline, key events, and lab trends.
+Provide 2-3 concise sentences summarizing the patient's age, timeline, key events, and lab trends.
 
 **Labs**
-List the key lab values as provided, e.g.: “Cr 5.4 mg/dL; K 7.4 mEq/L; HCO3 9 mEq/L.”
+List the key lab values as provided, e.g.: "Cr 5.4 mg/dL; K 7.4 mEq/L; HCO3 9 mEq/L."
 
 **Assessment & Plan**
 For each trigger, write one narrative paragraph:
@@ -80,7 +81,7 @@ extract_fn = {
 st.title("AI Note Writer for Nephrology Consultations")
 
 reason = st.text_input("Reason for Consultation:")
-hpi = st.text_area("HPI (2–3 sentences):", height=80)
+hpi = st.text_area("HPI (2-3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, Na, Ca):", height=80)
 free_text = st.text_area(
     "Additional Context / A&P notes:", height=120,
