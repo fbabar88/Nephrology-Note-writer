@@ -34,32 +34,33 @@ TRIGGERS = {
     "HRS management": "Albumin 25% 1 g/kg/day ×48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg"
 }
 
-# Extraction system prompt
+# Extraction prompt
 EXTRACTOR_SYSTEM = f"""
 You are a trigger-extraction assistant. Given a free-form user message, return a JSON list of exact trigger names chosen from this master list:
 {json.dumps(list(TRIGGERS.keys()))}
 Only output the JSON array.
 """
 
-# Generation system prompt
+# Generation prompt
 GENERATOR_SYSTEM = """
-You are a board-certified nephrology AI assistant. Always output notes formatted exactly as below, in this order:
+You are a board-certified nephrology AI assistant. Use the input sections below to craft a single, coherent consult note.
+
+- If any procedure or test is already mentioned as done in the HPI or Additional Context, do NOT recommend ordering it again; instead acknowledge its completion in the narrative.
+- Always format the note exactly as:
 
 **Reason for Consultation**  
 <one-line reason>
 
 **HPI**  
-2–3 concise sentences summarizing age, timeline, key events, and labs.
+2–3 concise sentences summarizing age, timeline, key events, labs, and context.
 
 **Assessment & Plan**  
-For each trigger, expand into:
-1. **<Problem Name>**: One-line explanation with supporting data (include relevant lab values).
-   - <Action bullet or single-line order, per trigger definition>
-
-Include each trigger’s diagnostic or therapeutic instructions exactly as defined.
+For each trigger provided:
+1. **<Trigger Name>**: One-line explanation incorporating any relevant lab values or context.  
+   - <use the exact action from TRIGGERS>
 """
 
-# Define function schema for extraction only
+# Define extraction function schema
 extract_fn = {
     "name": "extract_triggers",
     "description": "Extract nephrology triggers from free text",
@@ -82,12 +83,12 @@ reason = st.text_input("Reason for Consultation:")
 hpi = st.text_area("HPI (2–3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, Na, Ca):", height=80)
 free_text = st.text_area(
-    "Assessment & Plan (free text):", height=120,
-    help="List or describe the triggers you want, e.g. 'AKI workup, Start HD, Lokelma'"
+    "Additional Context / A&P notes:", height=120,
+    help="Include any narrative or context, e.g. 'US shows normal structure, so no repeat imaging.'"
 )
 
 if st.button("Generate Consultation Note"):
-    # Extract triggers
+    # 1) Extract triggers
     with st.spinner("Extracting triggers..."):
         resp1 = openai.ChatCompletion.create(
             model="gpt-4-0613",
@@ -101,23 +102,22 @@ if st.button("Generate Consultation Note"):
         )
         triggers = json.loads(resp1.choices[0].message.function_call.arguments)["triggers"]
 
-    # Filter out any unrecognized triggers
+    # Ensure valid triggers
     valid_triggers = [t for t in triggers if t in TRIGGERS]
     if not valid_triggers:
-        st.error("No valid triggers found. Please check your Assessment & Plan input.")
+        st.error("No valid triggers found. Please check your context input.")
     else:
-        # Prepare shorthand based on valid triggers
+        # 2) Build shorthand plus include context in generation input
         ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in valid_triggers)
-
-        # Build the content for generation
         user_content = (
             f"**Reason for Consultation:** {reason}\n\n"
             f"**HPI:** {hpi}\n\n"
             f"**Labs:** {labs}\n\n"
+            f"**Additional Context:** {free_text}\n\n"
             f"**Assessment & Plan:**\n{ap_shorthand}"
         )
 
-        # Generate final note
+        # 3) Generate final note
         with st.spinner("Generating note..."):
             resp2 = openai.ChatCompletion.create(
                 model="gpt-4-0613",
