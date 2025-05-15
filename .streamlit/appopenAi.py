@@ -46,18 +46,13 @@ GENERATOR_SYSTEM = """
 You are a board-certified nephrology AI assistant. Use the input sections below to craft a single, coherent consult note.
 
 - If any procedure or test is already mentioned as done in the HPI or Additional Context, do NOT recommend ordering it again; instead acknowledge its completion in the narrative.
-- Always format the note exactly as:
+- Format the Assessment & Plan as one paragraph per problem. Each paragraph should start with **<Problem Name>** followed by a space and then a concise narrative that incorporates relevant lab data, context, and the exact action from TRIGGERS.
 
-**Reason for Consultation**  
-<one-line reason>
+Examples:
+**AKI workup**: Non-oliguric acute kidney injury likely due to contrast nephropathy and possible relative hypotension, with creatinine rising from 0.8 to 5.4 mg/dL; perform renal ultrasound, urine electrolytes (Na, Cl, Cr), and quantify proteinuria.
+**Start HD**: Given hyperkalemia (K 7.4 mEq/L) and metabolic acidosis (HCO₃ 9 mEq/L), initiate hemodialysis to optimize volume status and manage electrolyte imbalance.
 
-**HPI**  
-2–3 concise sentences summarizing age, timeline, key events, labs, and context.
-
-**Assessment & Plan**  
-For each trigger provided:
-1. **<Trigger Name>**: One-line explanation incorporating any relevant lab values or context.  
-   - <use the exact action from TRIGGERS>
+Always adhere to this structure without bullet lists.
 """
 
 # Define extraction function schema
@@ -102,12 +97,12 @@ if st.button("Generate Consultation Note"):
         )
         triggers = json.loads(resp1.choices[0].message.function_call.arguments)["triggers"]
 
-    # Ensure valid triggers
+    # 2) Ensure valid triggers
     valid_triggers = [t for t in triggers if t in TRIGGERS]
     if not valid_triggers:
         st.error("No valid triggers found. Please check your context input.")
     else:
-        # 2) Build shorthand plus include context in generation input
+        # 3) Build shorthand and generation input
         ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in valid_triggers)
         user_content = (
             f"**Reason for Consultation:** {reason}\n\n"
@@ -117,7 +112,7 @@ if st.button("Generate Consultation Note"):
             f"**Assessment & Plan:**\n{ap_shorthand}"
         )
 
-        # 3) Generate final note
+        # 4) Generate final note
         with st.spinner("Generating note..."):
             resp2 = openai.ChatCompletion.create(
                 model="gpt-4-0613",
