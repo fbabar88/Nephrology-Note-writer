@@ -34,25 +34,30 @@ TRIGGERS = {
     "HRS management": "Albumin 25% 1 g/kg/day ×48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP ≥ 110 mmHg"
 }
 
-# Extraction prompt
-EXTRACTOR_SYSTEM = f"""
-You are a trigger-extraction assistant. Given a free-form user message, return a JSON list of exact trigger names chosen from this master list:
+# Extraction prompt for trigger names\ nEXTRACTOR_SYSTEM = f"""
+You are a trigger-extraction assistant. Given a free-form user message, return a JSON array of exact trigger names selected from this master list:
 {json.dumps(list(TRIGGERS.keys()))}
 Only output the JSON array.
 """
 
-# Generation prompt
+# Generation prompt for the full note
 GENERATOR_SYSTEM = """
-You are a board-certified nephrology AI assistant. Use the input sections below to craft a single, coherent consult note.
+You are a board-certified nephrology AI assistant. Compose a complete consultation note using the sections below, in this exact order:
 
-- If any procedure or test is already mentioned as done in the HPI or Additional Context, do NOT recommend ordering it again; instead acknowledge its completion in the narrative.
-- Format the Assessment & Plan as one paragraph per problem. Each paragraph should start with **<Problem Name>** followed by a space and then a concise narrative that incorporates relevant lab data, context, and the exact action from TRIGGERS.
+**Reason for Consultation**
+Use the reason text provided as a single line.
 
-Examples:
-**AKI workup**: Non-oliguric acute kidney injury likely due to contrast nephropathy and possible relative hypotension, with creatinine rising from 0.8 to 5.4 mg/dL; perform renal ultrasound, urine electrolytes (Na, Cl, Cr), and quantify proteinuria.
-**Start HD**: Given hyperkalemia (K 7.4 mEq/L) and metabolic acidosis (HCO₃ 9 mEq/L), initiate hemodialysis to optimize volume status and manage electrolyte imbalance.
+**HPI**
+Provide 2–3 concise sentences summarizing the patient's age, timeline, key events, and lab trends.
 
-Always adhere to this structure without bullet lists.
+**Labs**
+List the key lab values as provided, e.g.: “Cr 5.4 mg/dL; K 7.4 mEq/L; HCO3 9 mEq/L.”
+
+**Assessment & Plan**
+For each trigger, write one narrative paragraph:
+**<Trigger Name>**: <Interpretation incorporating lab values or context; if a test is already completed, acknowledge it; otherwise recommend exactly the action defined in TRIGGERS.>
+
+Do not use bullet points. Adhere strictly to this format without deviation.
 """
 
 # Define extraction function schema
@@ -79,7 +84,7 @@ hpi = st.text_area("HPI (2–3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, Na, Ca):", height=80)
 free_text = st.text_area(
     "Additional Context / A&P notes:", height=120,
-    help="Include any narrative or context, e.g. 'US shows normal structure, so no repeat imaging.'"
+    help="Include narrative or notes; mention completed tests or specific context."
 )
 
 if st.button("Generate Consultation Note"):
@@ -97,12 +102,12 @@ if st.button("Generate Consultation Note"):
         )
         triggers = json.loads(resp1.choices[0].message.function_call.arguments)["triggers"]
 
-    # 2) Ensure valid triggers
+    # 2) Validate triggers
     valid_triggers = [t for t in triggers if t in TRIGGERS]
     if not valid_triggers:
-        st.error("No valid triggers found. Please check your context input.")
+        st.error("No valid triggers found. Please check your input.")
     else:
-        # 3) Build shorthand and generation input
+        # 3) Build user_content for generation
         ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in valid_triggers)
         user_content = (
             f"**Reason for Consultation:** {reason}\n\n"
