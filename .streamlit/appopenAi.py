@@ -2,9 +2,6 @@ import streamlit as st
 import openai
 import json
 
-# Secure your API key in .streamlit/secrets.toml:
-# OPENAI_API_KEY = "your_api_key_here"
-
 # Configure OpenAI API
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
@@ -34,14 +31,22 @@ TRIGGERS = {
     "HRS management": "Albumin 25% 1 g/kg/day x48 h, Midodrine 10 mg TID, Octreotide 100 mcg BID, target SBP >= 110 mmHg"
 }
 
-# Extraction prompt for trigger names
+# Enhanced extraction prompt for trigger names
 EXTRACTOR_SYSTEM = f"""
-You are a trigger-extraction assistant. Given a free-form user message, return a JSON array of exact trigger names selected from this master list:
-{json.dumps(list(TRIGGERS.keys()))}
-Only output the JSON array.
+You are a trigger-extraction assistant. Given a free-form user message:
+1. Return a JSON object containing:
+   - "triggers": array of exact trigger names from this master list: {json.dumps(list(TRIGGERS.keys()))}
+   - "free_text_items": array of additional assessment/plan items not covered by triggers
+2. Ensure no information is lost between triggers and free text items.
+
+Example output:
+{{
+    "triggers": ["AKI workup", "Bone mineral disease"],
+    "free_text_items": ["Continue current immunosuppression regimen", "Follow up in transplant clinic in 1 week"]
+}}
 """
 
-# Generation prompt for the full note
+# Enhanced generation prompt for the full note
 GENERATOR_SYSTEM = """
 You are a board-certified nephrology AI assistant. Compose a complete consultation note using the sections below, in this exact order:
 
@@ -55,25 +60,35 @@ Provide 2-3 concise sentences summarizing the patient's age, timeline, key event
 List the key lab values as provided, e.g.: "Cr 5.4 mg/dL; K 7.4 mEq/L; HCO3 9 mEq/L."
 
 **Assessment & Plan**
-For each trigger, write one narrative paragraph:
-**<Trigger Name>**: <Interpretation incorporating lab values or context; if a test is already completed, acknowledge it; otherwise recommend exactly the action defined in TRIGGERS.>
+1. First, address all trigger-based items with clear, actionable plans.
+2. Then, incorporate any additional assessment/plan items from the free text.
+3. Ensure a cohesive narrative that integrates both structured triggers and free-text information.
+4. Use direct imperative phrasing for all recommendations.
+5. Acknowledge completed tests and incorporate relevant context.
+6. Maintain logical flow between related items.
 
-Do not use bullet points. Adhere strictly to this format without deviation.
+Example:
+1. **AKI workup**: Non-oliguric acute kidney injury, Cr rose from 0.8 to 5.4 mg/dL. Renal ultrasound completed showing normal kidneys. Order urine electrolytes (Na, Cl, Cr) and quantify proteinuria.
+2. **Additional Management**: Continue current immunosuppression regimen as previously adjusted. Schedule follow-up in transplant clinic in 1 week for close monitoring.
 """
 
-# Define extraction function schema
+# Define enhanced extraction function schema
 extract_fn = {
-    "name": "extract_triggers",
-    "description": "Extract nephrology triggers from free text",
+    "name": "extract_content",
+    "description": "Extract nephrology triggers and additional items from free text",
     "parameters": {
         "type": "object",
         "properties": {
             "triggers": {
                 "type": "array",
                 "items": {"type": "string", "enum": list(TRIGGERS.keys())}
+            },
+            "free_text_items": {
+                "type": "array",
+                "items": {"type": "string"}
             }
         },
-        "required": ["triggers"]
+        "required": ["triggers", "free_text_items"]
     }
 }
 
@@ -85,12 +100,12 @@ hpi = st.text_area("HPI (2-3 sentences):", height=80)
 labs = st.text_area("Labs (e.g., Cr, Na, Ca):", height=80)
 free_text = st.text_area(
     "Additional Context / A&P notes:", height=120,
-    help="Include narrative or notes; mention completed tests or specific context."
+    help="Include any additional assessment and plan items, completed tests, or specific context."
 )
 
 if st.button("Generate Consultation Note"):
-    # 1) Extract triggers
-    with st.spinner("Extracting triggers..."):
+    # 1) Extract triggers and free text items
+    with st.spinner("Processing input..."):
         resp1 = openai.ChatCompletion.create(
             model="gpt-4-0613",
             messages=[
@@ -98,28 +113,31 @@ if st.button("Generate Consultation Note"):
                 {"role": "user", "content": free_text}
             ],
             functions=[extract_fn],
-            function_call={"name": "extract_triggers"},
+            function_call={"name": "extract_content"},
             temperature=0
         )
-        triggers = json.loads(resp1.choices[0].message.function_call.arguments)["triggers"]
+        content = json.loads(resp1.choices[0].message.function_call.arguments)
+        triggers = content["triggers"]
+        free_text_items = content["free_text_items"]
 
-    # 2) Validate triggers
-    valid_triggers = [t for t in triggers if t in TRIGGERS]
-    if not valid_triggers:
-        st.error("No valid triggers found. Please check your input.")
+    # 2) Validate content
+    if not triggers and not free_text_items:
+        st.error("No valid assessment and plan items found. Please check your input.")
     else:
-        # 3) Build user_content for generation
-        ap_shorthand = "\n".join(f"{t}: {TRIGGERS[t]}" for t in valid_triggers)
+        # 3) Build enhanced user_content for generation
+        trigger_content = "\n".join(f"TRIGGER: {t}: {TRIGGERS[t]}" for t in triggers)
+        free_text_content = "\n".join(f"FREE TEXT: {item}" for item in free_text_items)
+        
         user_content = (
             f"**Reason for Consultation:** {reason}\n\n"
             f"**HPI:** {hpi}\n\n"
             f"**Labs:** {labs}\n\n"
-            f"**Additional Context:** {free_text}\n\n"
-            f"**Assessment & Plan:**\n{ap_shorthand}"
+            f"**Assessment & Plan Items:**\n{trigger_content}\n{free_text_content}\n\n"
+            f"**Original Context:** {free_text}"
         )
 
         # 4) Generate final note
-        with st.spinner("Generating note..."):
+        with st.spinner("Generating comprehensive note..."):
             resp2 = openai.ChatCompletion.create(
                 model="gpt-4-0613",
                 messages=[
@@ -127,7 +145,7 @@ if st.button("Generate Consultation Note"):
                     {"role": "user", "content": user_content}
                 ],
                 temperature=0.7,
-                max_tokens=1200
+                max_tokens=1500
             )
             note = resp2.choices[0].message.content.strip()
 
